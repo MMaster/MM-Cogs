@@ -172,7 +172,7 @@ class RedditMM(commands.Cog):
 
     @commands.admin_or_permissions(manage_channels=True)
     @commands.guild_only()
-    @commands.hybrid_group(aliases=["redditmm"])
+    @commands.hybrid_group(aliases=["reddit"])
     async def redditmm(self, ctx):
         """Reddit auto-feed posting."""
 
@@ -537,10 +537,10 @@ class RedditMM(commands.Cog):
             #        print(image_url)
 
             embs = []
-            debug = str(feed.media_metadata)
-            if len(debug) > 1990:
-                debug = f"DBG:{debug[:1990]}..."
-            desc = desc + "\n" + debug
+            #debug = str(feed.media_metadata)
+            #if len(debug) > 1990:
+            #    debug = f"DBG:{debug[:1990]}..."
+            #desc = desc + "\n" + debug
             embed = discord.Embed(
                 title=unescape(title),
                 url=unescape(link),
