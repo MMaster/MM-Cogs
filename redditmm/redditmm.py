@@ -577,20 +577,24 @@ class RedditMM(commands.Cog):
                 post["author"] = None
 
             images = False
-            if image.endswith(("png", "jpg", "jpeg", "gif")) and not feed.spoiler:
-                embed.set_image(url=unescape(image))
-                embed.add_field(name="Image URL", value=unescape(image))
+            if "redgifs.com" in image and feed.permalink not in image and validators.url(image):
+                if "i.redgifs.com" in image:
+                    if image.endswith(("png", "jpg", "jpeg", "gif")):
+                        post["content_link"] = unescape(image).replace("i.redgifs.com", "www.redgifs.com").replace("/i/", "/watch/")
+                        post["content_link"] = post["content_link"].rsplit('.', maxsplit=1)[0]
+                    else:
+                        embed.set_image(url=unescape(image))
+                        embed.add_field(name="RedGIFS URL", value=unescape(image))
+                else:
+                    post["content_link"] = unescape(image)
                 images = True
             elif feed.permalink not in image and validators.url(image) and "gallery" in image:
                 embed.set_image(url=unescape(image))
                 embed.add_field(name="Gallery URL", value=unescape(image))
                 images = True
-            elif feed.permalink not in image and validators.url(image) and "redgifs.com" in image:
-                if "i.redgifs.com" in image:
-                    embed.set_image(url=unescape(image))
-                    embed.add_field(name="RedGIFS URL", value=unescape(image))
-                else:
-                    post["content_link"] = unescape(image)
+            elif image.endswith(("png", "jpg", "jpeg", "gif")) and not feed.spoiler:
+                embed.set_image(url=unescape(image))
+                embed.add_field(name="Image URL", value=unescape(image))
                 images = True
             elif feed.permalink not in image and validators.url(image):
                 embed.add_field(name="Attachment", value=unescape(image))
@@ -614,7 +618,7 @@ class RedditMM(commands.Cog):
                                 )  # TODO: More approprriate error handling
                                 if post["content_link"]:
                                     content_msg = await channel.send(
-                                        content=f"* {post['content_link']} *",
+                                        content=f"( {post['content_link']} )",
                                         view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                     )  # TODO: More approprriate error handling
 
