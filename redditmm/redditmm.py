@@ -613,6 +613,11 @@ class RedditMM(commands.Cog):
                                     embeds=post["embeds"],
                                     view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                 )  # TODO: More approprriate error handling
+                                if post["content_link"]:
+                                    content_msg = await channel.send(
+                                        content=post["content_link"],
+                                    )  # TODO: More approprriate error handling
+
                                 if settings.get("publish", False):
                                     try:
                                         await msg.publish()
