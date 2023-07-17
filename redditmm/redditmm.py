@@ -578,6 +578,15 @@ class RedditMM(commands.Cog):
             images = False
             if image.endswith(("png", "jpg", "jpeg", "gif")) and not feed.spoiler:
                 embed.set_image(url=unescape(image))
+                embed.add_field(name="Image URL", value=unescape(image))
+                images = True
+            elif feed.permalink not in image and validators.url(image) and "gallery" in image:
+                embed.set_image(url=unescape(image))
+                embed.add_field(name="Gallery URL", value=unescape(image))
+                images = True
+            elif feed.permalink not in image and validators.url(image) and "redgifs.com" in image:
+                embed.set_image(url=unescape(image))
+                embed.add_field(name="RedGIFS URL", value=unescape(image))
                 images = True
             elif feed.permalink not in image and validators.url(image):
                 embed.add_field(name="Attachment", value=unescape(image))
