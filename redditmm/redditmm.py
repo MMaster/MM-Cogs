@@ -588,9 +588,9 @@ class RedditMM(commands.Cog):
             elif feed.permalink not in image and validators.url(image) and "redgifs.com" in image:
                 if "i.redgifs.com" in image:
                     embed.set_image(url=unescape(image))
+                    embed.add_field(name="RedGIFS URL", value=unescape(image))
                 else:
                     post["content_link"] = unescape(image)
-                embed.add_field(name="RedGIFS URL", value=unescape(image))
                 images = True
             elif feed.permalink not in image and validators.url(image):
                 embed.add_field(name="Attachment", value=unescape(image))
@@ -609,13 +609,13 @@ class RedditMM(commands.Cog):
                         if webhook is None:
                             try:
                                 msg = await channel.send(
-                                    content=post["content_link"],
                                     embeds=post["embeds"],
-                                    view=PosterView(post["author"], True, link, settings.get("source_button", False)),
+                                    view=PosterView(post["author"], True, link, settings.get("source_button", False)) if not post["content_link"] else None,
                                 )  # TODO: More approprriate error handling
                                 if post["content_link"]:
                                     content_msg = await channel.send(
                                         content=post["content_link"],
+                                        view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                     )  # TODO: More approprriate error handling
 
                                 if settings.get("publish", False):
