@@ -749,6 +749,11 @@ class RedditMM(commands.Cog):
                 break
             timestamps.append(timestamp)
 
+            # check if redditor is ignored and skip if yes
+            author = unescape(feed.author.name)
+            if await self.db.get_ignored_redditor(channel.guild.id, author) is not None:
+                continue
+
             # if already seen (posted in any channel) in this server, skip
             if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
                 continue
