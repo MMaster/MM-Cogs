@@ -69,9 +69,9 @@ class RedditMMDB():
 
     def add_seen_url(self, guildID, url):
         cur = self.conn.cursor()
-        log.info(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
         cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
         seenid = cur.lastrowid
+        self.conn.commit()
         cur.close()
         return seenid
 
