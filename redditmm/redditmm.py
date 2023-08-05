@@ -41,12 +41,8 @@ class RedditMMDB():
         self.filepath = os.path.join(self.data_path, "datadb.sqlite3")
         self.conn = None
 
-    async def init(self):
-        async with RedditMMDB._lock:
-            self.conn = sqlite3.connect(self.filepath)
-
-        cur = self.conn.cursor()
-        cur.execute("PRAGMA journal_mode=wal")
+    async def prepare_seen_urls_table(self, cur):
+        # check if table exists
         cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='seen_urls'")
 
         #if the table does not exist, create it
@@ -61,33 +57,91 @@ class RedditMMDB():
 
                 self.conn.commit()
 
+    async def prepare_ignored_redditors(self, cur):
+        # check if table exists
+        cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='ignored_redditors'")
+
+        #if the table does not exist, create it
+        if cur.fetchone()[0] == 0:
+            async with RedditMMDB._lock:
+                # create seen urls table to store urls of posts we've already seen
+                cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP)")
+                # we will search by guildID so create index on it
+                cur.execute("CREATE INDEX ignored_redditors_idx_guildID ON ignored_redditors(guildID)")
+                # we will search for redditor so create index on it
+                cur.execute("CREATE INDEX ignored_redditors_idx_redditor ON ignored_redditors(redditor)")
+
+                self.conn.commit()
+
+    async def init(self):
+        async with RedditMMDB._lock:
+            self.conn = sqlite3.connect(self.filepath)
+
+        cur = self.conn.cursor()
+        cur.execute("PRAGMA journal_mode=wal")
+        await prepare_seen_urls_table(cur)
+        await prepare_ignored_redditors(cur)
         cur.close()
 
     async def get_seen_url(self, guildID, url):
         cur = self.conn.cursor()
         res = cur.execute(f"SELECT id FROM seen_urls WHERE guildID = {guildID} AND url = '{url}'")
         rt = res.fetchone()
-        seenid = None
+        rowid = None
         if rt is not None:
-            seenid = rt[0]
+            rowid = rt[0]
         cur.close()
-        return seenid
+        return rowid
 
     async def add_seen_url(self, guildID, url):
         cur = self.conn.cursor()
+        cnt = None
         async with RedditMMDB._lock:
             cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
-            seenid = cur.lastrowid
+            cnt = cur.rowcount
             self.conn.commit()
 
         cur.close()
-        return seenid
+        return cnt
+
+    async def get_ignored_redditor(self, guildID, redditor):
+        cur = self.conn.cursor()
+        res = cur.execute(f"SELECT id FROM ignored_redditors WHERE guildID = {guildID} AND redditor = '{redditor}'")
+        rt = res.fetchone()
+        rowid = None
+        if rt is not None:
+            rowid = rt[0]
+        cur.close()
+        return rowid
+
+    async def add_ignored_redditor(self, guildID, redditor):
+        cur = self.conn.cursor()
+        cnt = None
+        async with RedditMMDB._lock:
+            cur.execute(f"INSERT INTO ignored_redditors (guildID, redditor) VALUES ({guildID}, '{redditor}')")
+            rowid = cur.lastrowid
+            cnt = cur.rowcount
+            self.conn.commit()
+
+        cur.close()
+        return cnt
+
+    async def del_ignored_redditor(self, guildID, redditor):
+        cur = self.conn.cursor()
+        cnt = None
+        async with RedditMMDB._lock:
+            res = cur.execute(f"DELETE FROM ignored_redditors WHERE guildID = {guildID} AND redditor = '{redditor}'")
+            cnt = cur.rowcount
+            self.conn.commit()
+
+        cur.close()
+        return cnt
 
 
 class RedditMM(commands.Cog):
     """A reddit auto posting cog."""
 
-    __version__ = "0.7.2"
+    __version__ = "0.7.3"
 
     def format_help_for_context(self, ctx):
         """Thanks Sinbad."""
@@ -228,11 +282,113 @@ class RedditMM(commands.Cog):
             return match.groups()[-1].lower()
         return None
 
+    def get_message_redditor(self, message: discord.Message):
+        if message is None:
+            return None
+
+        if len(message.embeds) < 1:
+            return None
+
+        emb = message.embeds[0]
+        if emb.footer is None:
+            return None
+
+        ft = emb.footer.text
+        if ft is None:
+            return None
+
+        ftarr = ft.split('/')
+        if len(ftarr) < 2:
+            return None
+
+        return ftarr[1]
+
+    @commands.Cog.listener()
+    async def on_reaction_add(
+        self, reaction: discord.Reaction, user: typing.Union[discord.Member, discord.User]
+    ) -> None:
+        if await self.bot.cog_disabled_in_guild(
+            cog=self, guild=reaction.message.guild
+        ) or not await self.bot.allowed_by_whitelist_blacklist(who=user):
+            return
+        if reaction.message.guild is None:
+            return
+        if not isinstance(user, discord.Member):
+            return
+        if user.id == reaction.message.guild.me.id:
+            return
+
+        # if the message did not originate from this cog
+        ctx: commands.Context = await self.bot.get_context(reaction.message)
+        if ctx.valid and (ctx.command.cog_name != "RedditMM"):
+            log.info(f"Added reaction on message not originating from this cog. Skip.")
+            return
+
+        # ignore user
+        if reaction.emoji == "❌":
+            redditor = get_message_redditor(reaction.message)
+            if redditor is None:
+                await reaction.message.add_reaction("⛔")
+                return
+
+            if self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
+                await reaction.message.add_reaction("♻")
+                return
+
+            if self.db.add_ignored_redditor(user.guild.id, redditor) is None:
+                await reaction.message.add_reaction("⚠")
+                return
+
+            await reaction.message.add_reaction("✅")
+            return
+
+
+    @commands.Cog.listener()
+    async def on_reaction_remove(
+        self, reaction: discord.Reaction, user: typing.Union[discord.Member, discord.User]
+    ) -> None:
+        if await self.bot.cog_disabled_in_guild(
+            cog=self, guild=reaction.message.guild
+        ) or not await self.bot.allowed_by_whitelist_blacklist(who=user):
+            return
+        if reaction.message.guild is None:
+            return
+        if not isinstance(user, discord.Member):
+            return
+        if user.id == reaction.message.guild.me.id:
+            return
+
+        # if the message did not originate from this cog
+        ctx: commands.Context = await self.bot.get_context(reaction.message)
+        if ctx.valid and (ctx.command.cog_name != "RedditMM"):
+            log.info(f"Removed reaction on message not originating from this cog. Skip.")
+            return
+
+        # remove ignore user
+        if reaction.emoji == "❌":
+            redditor = get_message_redditor(reaction.message)
+            if redditor is None:
+                await reaction.message.add_reaction("⛔")
+                return
+
+            if self.db.get_ignored_redditor(user.guild.id, redditor) is None:
+                await reaction.message.add_reaction("♻")
+                return
+
+            cnt = self.db.del_ignored_redditor(user.guild.id, redditor)
+            if cnt is None or cnt < 1:
+                await reaction.message.add_reaction("⚠")
+                return
+
+            await reaction.message.clear_reaction("✅")
+            return
+
     @commands.admin_or_permissions(manage_channels=True)
     @commands.guild_only()
     @commands.hybrid_group(aliases=["reddit"])
     async def redditmm(self, ctx):
-        """Reddit auto-feed posting."""
+        """Reddit auto-feed posting.
+        Use ❌ (:x:) reaction to ignore the reddit user."""
 
     @redditmm.command()
     @commands.is_owner()
