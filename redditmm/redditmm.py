@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 import re
@@ -11,8 +12,9 @@ import asyncprawcore
 import discord
 import tabulate
 import validators
+import sqlite3
 from discord.http import Route
-from redbot.core import Config, app_commands, commands
+from redbot.core import Config, DataManager, app_commands, commands
 from redbot.core.commands.converter import TimedeltaConverter
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify, spoiler
 
@@ -31,11 +33,52 @@ class PosterView(discord.ui.View):
         if show_source:
             self.add_item(discord.ui.Button(label="Source", url=source))
 
+class RedditMMDB():
+    def __init__(self, data_path):
+        self.data_path = data_path
+        self.filepath = os.path.join(self.data_path, "datadb.sqlite3")
+        self.conn = None
+
+    def init(self):
+        self.conn = sqlite3.connect(self.filepath)
+        cur = self.conn.cursor()
+        cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='seen_urls'")
+
+        #if the table does not exist, create it
+        if cur.fetchone()[0] == 0:
+            # create seen urls table to store urls of posts we've already seen
+            cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP)")
+            # we will search by guildID so create index on it
+            cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID)")
+            # we will search for url so create index on it
+            cur.execute("CREATE INDEX seen_urls_idx_url ON seen_urls(url)")
+
+            self.conn.commit()
+
+        cur.close()
+
+    def get_seen_url(self, guildID, url):
+        cur = self.conn.cursor()
+        res = cur.execute(f"SELECT id FROM seen_urls WHERE guildID = {guildID} AND url = '{url}'")
+        rt = res.fetchone()
+        seeid = None
+        if rt is not None:
+            seenid = rt[0]
+        cur.close()
+        return seenid
+
+    def add_seen_url(self, guildID, url):
+        cur = self.conn.cursor()
+        cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, {url})")
+        seenid = cur.lastrowid
+        cur.close()
+        return seenid
+
 
 class RedditMM(commands.Cog):
     """A reddit auto posting cog."""
 
-    __version__ = "0.7.1"
+    __version__ = "0.7.2"
 
     def format_help_for_context(self, ctx):
         """Thanks Sinbad."""
@@ -47,6 +90,8 @@ class RedditMM(commands.Cog):
         self.config = Config.get_conf(self, identifier=141445739606515601, force_registration=True)
         self.config.register_channel(reddits={})
         self.config.register_global(delay=300, SCHEMA_VERSION=1)
+        self.data_path = DataManager.cog_data_path(self)
+        self.db = RedditMMDB(self.data_path)
         self.session = aiohttp.ClientSession()
         self.bg_loop_task: Optional[asyncio.Task] = None
         self.notified = False
@@ -54,14 +99,15 @@ class RedditMM(commands.Cog):
         self.bot.loop.create_task(self.init())
 
     async def red_get_data_for_user(self, *, user_id: int):
-        # this cog does not story any data
+        # this cog does not store any data for user
         return {}
 
     async def red_delete_data_for_user(self, *, requester, user_id: int) -> None:
-        # this cog does not story any data
+        # this cog does not store any data for user
         pass
 
     async def init(self):
+        self.db.init()
         await self.bot.wait_until_red_ready()
         if await self.config.SCHEMA_VERSION() == 1:
             data = await self.config.all_channels()
@@ -97,6 +143,7 @@ class RedditMM(commands.Cog):
             self.bg_loop_task.cancel()
         await self.session.close()
         await self.client.close()
+        self.db.close()
 
     @commands.Cog.listener()
     async def on_red_api_tokens_update(self, service_name, api_tokens):
@@ -536,6 +583,11 @@ class RedditMM(commands.Cog):
             if timestamp <= last_post:
                 break
             timestamps.append(timestamp)
+
+            # if already seen (posted in any channel) in this server, skip
+            if self.db.get_seen_url(channel.guild.id, feed.url) is not None:
+                continue
+
             desc = unescape(feed.selftext)
             image = feed.url
             link = f"https://reddit.com{feed.permalink}"
@@ -605,6 +657,9 @@ class RedditMM(commands.Cog):
             embs.append(embed)
             post["embeds"] = embs
             posts.append(post)
+
+            # remember we've seen this url for this server
+            self.db.add_seen_url(channel.guild.id, feed.url)
 
         if timestamps:
             if posts:
