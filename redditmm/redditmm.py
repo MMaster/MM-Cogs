@@ -79,8 +79,8 @@ class RedditMMDB():
 
         cur = self.conn.cursor()
         cur.execute("PRAGMA journal_mode=wal")
-        await prepare_seen_urls_table(cur)
-        await prepare_ignored_redditors(cur)
+        await self.prepare_seen_urls_table(cur)
+        await self.prepare_ignored_redditors(cur)
         cur.close()
 
     async def get_seen_url(self, guildID, url):
@@ -327,7 +327,7 @@ class RedditMM(commands.Cog):
         # ignore user
         if reaction.emoji == "❌":
             async with ctx.typing():
-                redditor = get_message_redditor(reaction.message)
+                redditor = self.get_message_redditor(reaction.message)
                 if redditor is None:
                     await reaction.message.add_reaction("⛔")
                     return
@@ -368,7 +368,7 @@ class RedditMM(commands.Cog):
         # remove ignore user
         if reaction.emoji == "❌":
             async with ctx.typing():
-                redditor = get_message_redditor(reaction.message)
+                redditor = self.get_message_redditor(reaction.message)
                 if redditor is None:
                     await reaction.message.add_reaction("⛔")
                     return
