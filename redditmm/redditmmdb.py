@@ -30,11 +30,9 @@ class RedditMMDB():
         if cur.fetchone()[0] == 0:
             async with RedditMMDB._lock:
                 # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                # we will search by guildID so create index on it
-                cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID)")
-                # we will search for url so create index on it
-                cur.execute("CREATE INDEX seen_urls_idx_url ON seen_urls(url)")
+                cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildURL UNIQUE (guildID, url))")
+                # create multi-index on it
+                cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID, url)")
 
                 self.conn.commit()
 
@@ -46,11 +44,9 @@ class RedditMMDB():
         if cur.fetchone()[0] == 0:
             async with RedditMMDB._lock:
                 # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                # we will search by guildID so create index on it
-                cur.execute("CREATE INDEX ignored_redditors_idx_guildID ON ignored_redditors(guildID)")
-                # we will search for redditor so create index on it
-                cur.execute("CREATE INDEX ignored_redditors_idx_redditor ON ignored_redditors(redditor)")
+                cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditor UNIQUE (guildID, redditor))")
+                # create multi-index on it
+                cur.execute("CREATE INDEX ignored_redditors_idx ON ignored_redditors(guildID, redditor)")
 
                 self.conn.commit()
 
@@ -61,14 +57,9 @@ class RedditMMDB():
         #if the table does not exist, create it
         if cur.fetchone()[0] == 0:
             async with RedditMMDB._lock:
-                # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, url TEXT, favtime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                # we will search by guildID so create index on it
-                cur.execute("CREATE INDEX favorites_idx_guildID ON favorites(guildID)")
-                # we will search for redditor so create index on it
-                cur.execute("CREATE INDEX favorites_idx_redditor ON favorites(redditor)")
-                # we will search for url so create index on it
-                cur.execute("CREATE INDEX favorites_idx_url ON favorites(url)")
+                cur.execute("CREATE TABLE favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, userID INTEGER, redditor TEXT, url TEXT, favtime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditorURLUser UNIQUE (guildID, redditor, url, userID))")
+                # create multi-index on it
+                cur.execute("CREATE INDEX favorites_idx ON favorites(guildID, redditor, url, userID)")
 
                 self.conn.commit()
 
@@ -142,6 +133,8 @@ class RedditMMDB():
             res = cur.execute(f"DELETE FROM ignored_redditors WHERE guildID = {guildID} AND redditor = '{redditor}'")
             cnt = cur.rowcount
             self.conn.commit()
+            if cnt == 0:
+                cnt = None
 
         cur.close()
         return cnt
@@ -150,12 +143,15 @@ class RedditMMDB():
     # FAVORITES
     #
 
-    async def get_favorite(self, guildID, redditor, url=None):
+    async def get_favorite(self, guildID, redditor, url=None, userID=None):
         cur = self.conn.cursor()
-        if url is None:
-            res = cur.execute(f"SELECT count(id) FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'")
-        else:
-            res = cur.execute(f"SELECT count(id) FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}' AND url = '{url}'")
+        query = f"SELECT count(id) FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'"
+        if url is not None:
+            query += " AND url = '{url}'"
+        if userID is not None:
+            query += " AND userID = {userID}"
+
+        res = cur.execute(query)
         rt = res.fetchone()
         cnt = None
         if rt is not None:
@@ -165,27 +161,33 @@ class RedditMMDB():
         cur.close()
         return cnt
 
-    async def add_favorite(self, guildID, redditor, url):
+    async def add_favorite(self, guildID, redditor, url, userID):
         cur = self.conn.cursor()
         cnt = None
         async with RedditMMDB._lock:
-            cur.execute(f"INSERT INTO favorites (guildID, redditor, url) VALUES ({guildID}, '{redditor}', '{url}')")
+            cur.execute(f"INSERT INTO favorites (guildID, redditor, url, userID) VALUES ({guildID}, '{redditor}', '{url}', {userID})")
             cnt = cur.rowcount
             self.conn.commit()
 
         cur.close()
         return cnt
 
-    async def del_favorite(self, guildID, redditor, url=None):
+    async def del_favorite(self, guildID, redditor, url=None, userID=None):
         cur = self.conn.cursor()
         cnt = None
         async with RedditMMDB._lock:
-            if url is None:
-                res = cur.execute(f"DELETE FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'")
-            else:
-                res = cur.execute(f"DELETE FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}' AND url = '{url}'")
+            query = f"DELETE FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'"
+            if url is not None:
+                query += " AND url = '{url}'"
+            if userID is not None:
+                query += " AND userID = {userID}"
+
+            res = cur.execute(query)
             cnt = cur.rowcount
             self.conn.commit()
+
+            if cnt == 0:
+                cnt = None
 
         cur.close()
         return cnt

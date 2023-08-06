@@ -25,20 +25,31 @@ REDDIT_REGEX = re.compile(
     r"(?i)\A(((https?://)?(www\.)?reddit\.com/)?r/)?([A-Za-z0-9][A-Za-z0-9_]{2,20})/?\Z"
 )
 
-class PosterView(discord.ui.View):
-    def __init__(self, author:str, show_author: bool, source: str, show_source: bool):
-        super().__init__()
-        if show_author and author != None:
-            self.add_item(discord.ui.Button(label=f"u/{unescape(author)}", url=f"https://www.reddit.com/user/{author}"))
-        if show_source:
-            self.add_item(discord.ui.Button(label="Source", url=source))
+class PostMenuView(discord.ui.View):
+    def __init__(self, author: str = None, source: str = None):
+        super().__init__(timeout=None)
 
+        author_lbl = "❌"
+        author_url = "https://www.reddit.com"
+        if author is not None:
+            author_lbl = f"u/{author}"
+            author_url = f"https://www.reddit.com/user/{author}"
+        author_disabled = author is None
+
+        source_url = "https://www.reddit.com"
+        if source is not None:
+            source_url = source
+        source_disabled = source is None
+
+        self.add_item(discord.ui.Button(emoji="�", label=author_lbl, url=author_url, custom_id="redditmm:post.author", disabled=author_disabled))
+
+        self.add_item(discord.ui.Button(emoji="�", url=source_url, custom_id="redditmm:post.source", disabled=source_disabled))
 
 
 class RedditMM(commands.Cog):
     """A reddit auto posting cog."""
 
-    __version__ = "0.7.3"
+    __version__ = "0.7.4"
 
     def format_help_for_context(self, ctx):
         """Thanks Sinbad."""
@@ -160,11 +171,10 @@ class RedditMM(commands.Cog):
                     feed["last_post"],
                     url,
                     {
-                        "latest": feed.get("latest", True),
+                        "latest": feed.get("latest", False),
                         "webhooks": feed.get("webhooks", False),
                         "logo": feed.get("logo", REDDIT_LOGO),
                         "image_only": feed.get("image_only", False),
-                        "source_button": feed.get("source_button", False),
                         "publish": feed.get("publish", False),
                     },
                 )
@@ -179,26 +189,10 @@ class RedditMM(commands.Cog):
             return match.groups()[-1].lower()
         return None
 
-    def get_message_redditor(self, message: discord.Message):
-        if message is None:
-            return None
-
-        if len(message.embeds) < 1:
-            return None
-
-        emb = message.embeds[0]
-        if emb.footer is None:
-            return None
-
-        ft = emb.footer.text
-        if ft is None:
-            return None
-
-        ftarr = ft.split('/')
-        if len(ftarr) < 2:
-            return None
-
-        return ftarr[1]
+    async def add_temporary_reaction(self, message, emoji, delay=5):
+        await message.add_reaction(emoji)
+        await asyncio.sleep(delay)
+        await message.clear_reaction(emoji)
 
     @commands.Cog.listener()
     async def on_reaction_add(
@@ -218,27 +212,49 @@ class RedditMM(commands.Cog):
         # if the message did not originate from this cog
         ctx: commands.Context = await self.bot.get_context(reaction.message)
         if ctx.valid and (ctx.command.cog_name != "RedditMM"):
-            log.info(f"Added reaction on message not originating from this cog. Skip.")
             return
 
         # ignore user
         if reaction.emoji == "❌":
             async with ctx.typing():
-                redditor = self.get_message_redditor(reaction.message)
+                # TODO: only allow admins to do this
+                redditor = self.get_msg_redditor(reaction.message)
                 if redditor is None:
-                    await reaction.message.add_reaction("⛔")
+                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await reaction.message.remove_reaction(reaction.emoji, user)
                     return
 
                 if await self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
-                    await reaction.message.add_reaction("♻")
+                    await self.add_temporary_reaction(reaction.message, "♻")
                     return
 
                 if await self.db.add_ignored_redditor(user.guild.id, redditor) is None:
-                    await reaction.message.add_reaction("⚠")
+                    await self.add_temporary_reaction(reaction.message, "⚠")
                     return
 
-                await reaction.message.add_reaction("✅")
-                return
+                await self.add_temporary_reaction(reaction.message, "✅")
+            return
+
+        # favorite post
+        if reaction.emoji == "⭐":
+            async with ctx.typing():
+                redditor = self.get_msg_redditor(reaction.message)
+                if redditor is None:
+                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await reaction.message.remove_reaction(reaction.emoji, user)
+                    return
+
+                content_url = self.get_msg_content_url(reaction.message)
+                if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is not None:
+                    await self.add_temporary_reaction(reaction.message, "♻")
+                    return
+
+                if await self.db.add_favorite(user.guild.id, redditor, content_url, user.id) is None:
+                    await self.add_temporary_reaction(reaction.message, "⚠")
+                    return
+
+                await self.add_temporary_reaction(reaction.message, "✅")
+            return
 
 
     @commands.Cog.listener()
@@ -259,28 +275,48 @@ class RedditMM(commands.Cog):
         # if the message did not originate from this cog
         ctx: commands.Context = await self.bot.get_context(reaction.message)
         if ctx.valid and (ctx.command.cog_name != "RedditMM"):
-            log.info(f"Removed reaction on message not originating from this cog. Skip.")
             return
 
         # remove ignore user
         if reaction.emoji == "❌":
             async with ctx.typing():
-                redditor = self.get_message_redditor(reaction.message)
+                redditor = self.get_msg_redditor(reaction.message)
                 if redditor is None:
-                    await reaction.message.add_reaction("⛔")
+                    await self.add_temporary_reaction(reaction.message, "⛔")
                     return
 
                 if await self.db.get_ignored_redditor(user.guild.id, redditor) is None:
-                    await reaction.message.add_reaction("♻")
+                    await self.add_temporary_reaction(reaction.message, "♻")
                     return
 
                 cnt = await self.db.del_ignored_redditor(user.guild.id, redditor)
                 if cnt is None or cnt < 1:
-                    await reaction.message.add_reaction("⚠")
+                    await self.add_temporary_reaction(reaction.message, "⚠")
                     return
 
-                await reaction.message.clear_reaction("✅")
-                return
+                await self.add_temporary_reaction(reaction.message, "✅")
+            return
+
+        # remove favorite post
+        if reaction.emoji == "⭐":
+            async with ctx.typing():
+                redditor = self.get_msg_redditor(reaction.message)
+                if redditor is None:
+                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    return
+
+                content_url = self.get_msg_content_url(reaction.message)
+                if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is None:
+                    await self.add_temporary_reaction(reaction.message, "♻")
+                    return
+
+                cnt = await self.db.del_favorite(user.guild.id, redditor, content_url, user.id)
+                if cnt is None or cnt < 1:
+                    await self.add_temporary_reaction(reaction.message, "⚠")
+                    return
+
+                await self.add_temporary_reaction(reaction.message, "✅")
+            return
 
     @commands.admin_or_permissions(manage_channels=True)
     @commands.guild_only()
@@ -360,7 +396,7 @@ class RedditMM(commands.Cog):
             feeds[subreddit] = {
                 "subreddit": subreddit,
                 "last_post": datetime.now().timestamp(),
-                "latest": True,
+                "latest": False,
                 "logo": logo,
                 "webhooks": False,
                 "image_only": image_only,
@@ -381,9 +417,9 @@ class RedditMM(commands.Cog):
         data = await self.config.channel(channel).reddits()
         if not data:
             return await ctx.send("No subreddits here.")
-        output = [[k, v.get("webhooks", "False"), v.get("latest", True), v.get("image_only", False), v.get("source_button", False)] for k, v in data.items()]
+        output = [[k, v.get("webhooks", "False"), v.get("latest", False), v.get("image_only", False)] for k, v in data.items()]
 
-        out = tabulate.tabulate(output, headers=["Subreddit", "Webhooks", "Latest Posts", "Image Only", "Source Button"])
+        out = tabulate.tabulate(output, headers=["Subreddit", "Webhooks", "Latest Posts", "Image Only"])
         for page in pagify(str(out)):
             await ctx.send(
                 embed=discord.Embed(
@@ -446,11 +482,10 @@ class RedditMM(commands.Cog):
             0,
             subreddit,
             {
-                "latest": True,
+                "latest": False,
                 "webhooks": feeds[subreddit].get("webhooks", False),
                 "logo": feeds[subreddit].get("logo", REDDIT_LOGO),
                 "image_only": False,
-                "source_button": False,
                 "publish": False,
             },
         )
@@ -461,11 +496,12 @@ class RedditMM(commands.Cog):
 
     @redditmm.command(name="latest")
     @app_commands.describe(
-        subreddit="The subreddit to check for latest posts (or !all for all subreddits).",
+        subreddit="The subreddit to check for single latest post (or !all for all subreddits).",
         channel="The channel for the subreddit.",
+        on_or_off="Whether to enable or disable single latest post only.",
     )
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
-    async def latest(self, ctx, subreddit: str, latest: bool, channel: discord.TextChannel = None):
+    async def latest(self, ctx, subreddit: str, on_or_off: bool, channel: discord.TextChannel = None):
         """Whether to fetch all posts or just the latest post."""
         channel = channel or ctx.channel
         if subreddit != "!all":
@@ -481,7 +517,7 @@ class RedditMM(commands.Cog):
                     await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
                     return
 
-                feeds[subreddit]["latest"] = latest
+                feeds[subreddit]["latest"] = on_or_off 
         if ctx.interaction:
             await ctx.send("Subreddit updated.", ephemeral=True)
         else:
@@ -513,37 +549,6 @@ class RedditMM(commands.Cog):
                     return
 
                 feeds[subreddit]["image_only"] = on_or_off
-        if ctx.interaction:
-            await ctx.send("Subreddit updated.", ephemeral=True)
-        else:
-            await ctx.tick()
-
-    @redditmm.command()
-    @app_commands.describe(
-        subreddit="The subreddit name (or !all for all subreddits).",
-        channel="The channel for the subreddit.",
-        on_or_off="Whether to enable or disable source button.",
-    )
-    @commands.bot_has_permissions(send_messages=True, embed_links=True)
-    async def source(
-        self, ctx, subreddit: str, on_or_off: bool, channel: discord.TextChannel = None
-    ):
-        """Whether to include a Source button.."""
-        channel = channel or ctx.channel
-        if subreddit != "!all":
-            subreddit = self._clean_subreddit(subreddit)
-        if not subreddit:
-            return await ctx.send("That doesn't look like a subreddit name to me.")
-        async with self.config.channel(channel).reddits() as feeds:
-            if subreddit == "!all":
-                for feed in feeds:
-                    feed["source_button"] = on_or_off
-            else:
-                if subreddit not in feeds:
-                    await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
-                    return
-                feeds[subreddit]["source_button"] = on_or_off
-
         if ctx.interaction:
             await ctx.send("Subreddit updated.", ephemeral=True)
         else:
@@ -622,10 +627,120 @@ class RedditMM(commands.Cog):
         except Exception:
             return None
 
+    def get_msg_redditor(self, message: discord.Message):
+        if message is None:
+            return None
+
+        if message.components is None or len(message.components) < 4:
+            return None
+
+        for comp in message.components:
+            if comp.custom_id == "redditmm:post.author":
+                author = comp.label
+                if not author.startswith("u/"):
+                    return None
+                return author[2:]
+
+        return None
+
+    def get_msg_source(self, message: discord.Message):
+        if message is None:
+            return None
+
+        if message.components is None or len(message.components) < 4:
+            return None
+
+        for comp in message.components:
+            if comp.custom_id == "redditmm:post.source":
+                return comp.url
+
+        return None
+
+    def get_msg_content_url(self, message: discord.Message):
+        if message is None or message.content is None:
+            return None
+
+        content = message.content
+        carr = content.rsplit('_ ', maxsplit=1)
+        if len(carr) < 2:
+            return None
+        carr = carr[1].rsplit(' _', maxsplit=1)
+        if len(carr) < 2:
+            return None
+        return carr[0]
+
+    def prepare_post(self, feed, subreddit, settings):
+        post = {}
+        post["subreddit"] = unescape(subreddit)
+        title = unescape(feed.title)
+        if len(title) > 252:
+            title = f"{title[:252]}..."
+        post["title"] = title
+
+        desc = unescape(feed.selftext)
+        if len(desc) > 2000:
+            desc = f"{desc[:2000]}..."
+        if feed.spoiler:
+            desc = "(spoiler)\n" + spoiler(desc)
+        post["desc"] = desc
+        post["source"] = unescape(f"https://reddit.com{feed.permalink}")
+        post["time_text"] = f"<t:{feed.created_utc}>"
+        if feed.author:
+            post["author"] = unescape(feed.author.name)
+        else:
+            post["author"] = None
+
+        post["content_link"] = None
+        url = unescape(feed.url)
+        if feed.permalink not in url and validators.url(image):
+            if "i.redgifs.com" in url and url.endswith(("png", "jpg", "jpeg", "gif")):
+                content_link = url.replace("i.redgifs.com", "www.redgifs.com").replace("/i/", "/watch/")
+                post["content_link"] = content_link.rsplit('.', maxsplit=1)[0]
+            else:
+                post["content_link"] = url
+
+        post["embeds"] = None
+
+        return post
+
+    async def send_post(self, post, channel, settings, webhook):
+        if webhook is None:
+            try:
+                text = f"> _[[r/{post['subreddit']}](https://www.reddit.com/r/{post['subreddit']}/)]_\n"
+                text+= f"> ### {post['title']}\n"
+                if post['desc'] is not None and len(post['desc']) > 0:
+                    text+= f"> _{post['desc']}_\n"
+                # WARN: content link MUST be "_ {url} _" for get_msg_content_url() to work
+                #       it also MUST be the last thing in content surrounded like this
+                text+= f"> _ {post['content_link']} _\n"
+                text+= f"> _{post['time_text']}_"
+
+                msg = await channel.send(
+                    content=text,
+                    embeds=post["embeds"],
+                    view=PostMenuView(post['author'], post['source']),
+                )  # TODO: More approprriate error handling
+
+                if settings.get("publish", False):
+                    try:
+                        await msg.publish()
+                    except discord.Forbidden:
+                        log.info(
+                            f"Error publishing message feed in {channel}. Bypassing"
+                        )
+            except (discord.Forbidden, discord.HTTPException):
+                log.info(f"Error sending message feed in {channel}. Bypassing")
+        else:
+            # FIXME: Send proper content (embeds are not used for content anymore)
+            await webhook.send(
+                username=f"r/{post['subreddit']} (u/{post['author']})",
+                avatar_url=settings.get("icon", REDDIT_LOGO),
+                embeds=post["embeds"],
+            )
+
     async def format_send(self, data, channel, last_post, subreddit, settings):
-        timestamps = []
         posts = []
-        data = data[:1] if settings.get("latest", True) else data
+        data = data[:1] if settings.get("latest", False) else data
         webhook = None
         try:
             if (
@@ -639,129 +754,44 @@ class RedditMM(commands.Cog):
                     webhook = await channel.create_webhook(name=channel.guild.me.name)
         except Exception as e:
             log.error("Error in webhooks during reddit feed posting", exc_info=e)
+
+        latest_timestamp = last_post
         for feed in data:
             timestamp = feed.created_utc
+            if timestamp > last_post:
+                latest_timestamp = timestamp
             if feed.over_18 and not channel.is_nsfw():
-                timestamps.append(timestamp)
                 continue
             if timestamp <= last_post:
                 break
-            timestamps.append(timestamp)
 
             # check if redditor is ignored and skip if yes
-            author = unescape(feed.author.name)
-            if await self.db.get_ignored_redditor(channel.guild.id, author) is not None:
-                continue
+            if feed.author:
+                author = unescape(feed.author.name)
+                if await self.db.get_ignored_redditor(channel.guild.id, author) is not None:
+                    continue
 
             # if already seen (posted in any channel) in this server, skip
             if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
                 continue
 
-            desc = unescape(feed.selftext)
-            image = feed.url
-            link = f"https://reddit.com{feed.permalink}"
-            title = feed.title
-            if len(desc) > 2000:
-                desc = f"{desc[:2000]}..."
-            if len(title) > 252:
-                title = f"{title[:252]}..."
-            if feed.spoiler:
-                desc = "(spoiler)\n" + spoiler(desc)
-            
-            #image_dict = feed.media_metadata
-            #for image_item in image_dict.values():
-            #        largest_image = image_item['s']
-            #        image_url = largest_image['u']
-            #        print(image_url)
-
-            embs = []
-            post = {}
-            post["content_link"] = None
-
-            #debug = str(feed.media_metadata)
-            #if len(debug) > 1990:
-            #    debug = f"DBG:{debug[:1990]}..."
-            #desc = desc + "\n" + debug
-            embed = discord.Embed(
-                title=unescape(title),
-                url=unescape(link),
-                description=desc,
-                color=channel.guild.me.color,
-                timestamp=datetime.utcfromtimestamp(feed.created_utc),
-            )
-            embed.set_author(name=f"New post on r/{unescape(subreddit)}")
-            embed.set_footer(text=f"u/{unescape(feed.author.name)}")
-
-            if feed.author:
-                post["author"] = feed.author.name
-            else:
-                post["author"] = None
-
-            images = False
-            if "redgifs.com" in image and feed.permalink not in image and validators.url(image):
-                if "i.redgifs.com" in image:
-                    if image.endswith(("png", "jpg", "jpeg", "gif")):
-                        post["content_link"] = unescape(image).replace("i.redgifs.com", "www.redgifs.com").replace("/i/", "/watch/")
-                        post["content_link"] = post["content_link"].rsplit('.', maxsplit=1)[0]
-                    else:
-                        embed.set_image(url=unescape(image))
-                        embed.add_field(name="RedGIFS URL", value=unescape(image))
-                else:
-                    post["content_link"] = unescape(image)
-                images = True
-            elif feed.permalink not in image and validators.url(image) and "gallery" in image:
-                embed.set_image(url=unescape(image))
-                embed.add_field(name="Gallery URL", value=unescape(image))
-                images = True
-            elif image.endswith(("png", "jpg", "jpeg", "gif")) and not feed.spoiler:
-                embed.set_image(url=unescape(image))
-                embed.add_field(name="Image URL", value=unescape(image))
-                images = True
-            elif feed.permalink not in image and validators.url(image):
-                embed.add_field(name="Attachment", value=unescape(image))
-            if settings.get("image_only") and not images:
+            post = self.prepare_post(feed, subreddit, settings)
+            if settings.get("image_only") and post["content_link"] is None:
                 continue
 
             # TODO: gallery view, fetch images to multiple embeds
-            embs.append(embed)
-            post["embeds"] = embs
             posts.append(post)
 
             # remember we've seen this url for this server
             await self.db.add_seen_url(channel.guild.id, feed.url)
 
-        if timestamps:
-            if posts:
+        if latest_timestamp > last_post:
+            if len(posts) > 0:
                 try:
                     for post in posts[::-1]:
-                        if webhook is None:
-                            try:
-                                msg = await channel.send(
-                                    embeds=post["embeds"],
-                                    view=PosterView(post["author"], True, link, settings.get("source_button", False)) if not post["content_link"] else None,
-                                )  # TODO: More approprriate error handling
-                                if post["content_link"]:
-                                    content_msg = await channel.send(
-                                        content=f"( {post['content_link']} )",
-                                        view=PosterView(post["author"], True, link, settings.get("source_button", False)),
-                                    )  # TODO: More approprriate error handling
-
-                                if settings.get("publish", False):
-                                    try:
-                                        await msg.publish()
-                                    except discord.Forbidden:
-                                        log.info(
-                                            f"Error publishing message feed in {channel}. Bypassing"
-                                        )
-                            except (discord.Forbidden, discord.HTTPException):
-                                log.info(f"Error sending message feed in {channel}. Bypassing")
-                        else:
-                            await webhook.send(
-                                username=f"r/{feed.subreddit} (u/{unescape(post['author'])})",
-                                avatar_url=settings.get("icon", REDDIT_LOGO),
-                                embeds=post["embeds"],
-                            )
+                        self.send_post(post, channel, settings, webhook)
                 except discord.HTTPException as exc:
                     log.error("Exception in bg_loop while sending message: ", exc_info=exc)
-            return timestamps[0]
+            return latest_timestamp
         return None
+
