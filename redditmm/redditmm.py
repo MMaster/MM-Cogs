@@ -221,7 +221,6 @@ class RedditMM(commands.Cog):
                 redditor = self.get_msg_redditor(reaction.message)
                 if redditor is None:
                     await self.add_temporary_reaction(reaction.message, "⛔")
-                    await reaction.message.remove_reaction(reaction.emoji, user)
                     return
 
                 if await self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
@@ -241,7 +240,6 @@ class RedditMM(commands.Cog):
                 redditor = self.get_msg_redditor(reaction.message)
                 if redditor is None:
                     await self.add_temporary_reaction(reaction.message, "⛔")
-                    await reaction.message.remove_reaction(reaction.emoji, user)
                     return
 
                 content_url = self.get_msg_content_url(reaction.message)
@@ -633,7 +631,7 @@ class RedditMM(commands.Cog):
         if message is None:
             return None
 
-        if message.components is None or len(message.components) < 4:
+        if message.components is None or len(message.components) < 2:
             return None
 
         for comp in message.components:
@@ -649,7 +647,7 @@ class RedditMM(commands.Cog):
         if message is None:
             return None
 
-        if message.components is None or len(message.components) < 4:
+        if message.components is None or len(message.components) < 2:
             return None
 
         for comp in message.components:
