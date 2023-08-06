@@ -632,8 +632,12 @@ class RedditMM(commands.Cog):
             log.info("Cannot call get_msg_redditor on None message.")
             return None
 
-        if message.components is None or len(message.components) < 2:
-            log.info(f"Message components don't match expectation.")
+        if message.components is None:
+            log.info(f"Message components is None.")
+            return None
+
+        if len(message.components) < 2:
+            log.info(f"Message components don't match expectation: count = {len(message.components)} < 2")
             return None
 
         for comp in message.components:
