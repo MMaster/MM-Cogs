@@ -16,7 +16,7 @@ from discord.http import Route
 from redbot.core import Config, data_manager, app_commands, commands
 from redbot.core.commands.converter import TimedeltaConverter
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify, spoiler
-from redditmmdb import RedditMMDB
+from .redditmmdb import RedditMMDB
 
 log = logging.getLogger("red.mmaster.redditmm")
 
