@@ -323,7 +323,9 @@ class RedditMM(commands.Cog):
     @commands.hybrid_group(aliases=["reddit"])
     async def redditmm(self, ctx):
         """Reddit auto-feed posting.
-        Use ❌ reaction on message to ignore the reddit user (on first message if multiple like for redgifs)."""
+        Use ❌ reaction on message to ignore the reddit user.
+        Use ⭐ reaction on message to favorite the post.":
+        """
 
     @redditmm.command()
     @commands.is_owner()
