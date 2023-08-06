@@ -41,9 +41,9 @@ class PostMenuView(discord.ui.View):
             source_url = source
         source_disabled = source is None
 
-        self.add_item(discord.ui.Button(emoji="�", label=author_lbl, url=author_url, disabled=author_disabled))
+        self.add_item(discord.ui.Button(emoji="👤", label=author_lbl, url=author_url, disabled=author_disabled))
 
-        self.add_item(discord.ui.Button(emoji="�", url=source_url, disabled=source_disabled))
+        self.add_item(discord.ui.Button(emoji="🌐", url=source_url, disabled=source_disabled))
 
 
 class RedditMM(commands.Cog):
@@ -637,7 +637,7 @@ class RedditMM(commands.Cog):
             return None
 
         for comp in message.components:
-            if comp.emoji == "�":
+            if comp.emoji == "👤":
                 author = comp.label
                 if not author.startswith("u/"):
                     return None
@@ -653,7 +653,7 @@ class RedditMM(commands.Cog):
             return None
 
         for comp in message.components:
-            if comp.emoji == "�":
+            if comp.emoji == "🌐":
                 return comp.url
 
         return None
