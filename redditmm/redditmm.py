@@ -632,15 +632,15 @@ class RedditMM(commands.Cog):
             log.info("Cannot call get_msg_redditor on None message.")
             return None
 
-        if message.components is None:
-            log.info(f"Message components is None.")
+        if message.components is None or len(message.components) == 0:
+            log.info(f"No message components.")
             return None
 
-        if len(message.components) < 2:
-            log.info(f"Message components don't match expectation: count = {len(message.components)} < 2")
-            return None
+        comps = message.components
+        if comps[0].type == discord.ComponentType.action_row:
+            comps = comps[0].children
 
-        for comp in message.components:
+        for comp in comps:
             if str(comp.emoji) == "👤":
                 author = comp.label
                 if not author.startswith("u/"):
@@ -655,11 +655,15 @@ class RedditMM(commands.Cog):
             log.info("Cannot call get_msg_source on None message.")
             return None
 
-        if message.components is None or len(message.components) < 2:
-            log.info(f"Message components don't match expectation.")
+        if message.components is None or len(message.components) == 0:
+            log.info(f"No message components.")
             return None
 
-        for comp in message.components:
+        comps = message.components
+        if comps[0].type == discord.ComponentType.action_row:
+            comps = comps[0].children
+
+        for comp in comps:
             if str(comp.emoji) == "🌐":
                 return comp.url
 
