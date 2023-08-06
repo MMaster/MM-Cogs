@@ -789,7 +789,7 @@ class RedditMM(commands.Cog):
             if len(posts) > 0:
                 try:
                     for post in posts[::-1]:
-                        self.send_post(post, channel, settings, webhook)
+                        await self.send_post(post, channel, settings, webhook)
                 except discord.HTTPException as exc:
                     log.error("Exception in bg_loop while sending message: ", exc_info=exc)
             return latest_timestamp
