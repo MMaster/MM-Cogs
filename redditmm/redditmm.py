@@ -730,8 +730,8 @@ class RedditMM(commands.Cog):
                         log.info(
                             f"Error publishing message feed in {channel}. Bypassing"
                         )
-            except (discord.Forbidden, discord.HTTPException):
-                log.info(f"Error sending message feed in {channel}. Bypassing")
+            except (discord.Forbidden, discord.HTTPException) as e:
+                log.error(f"Error sending message feed in {channel}. Bypassing", exc_info=e)
         else:
             # FIXME: Send proper content (embeds are not used for content anymore)
             await webhook.send(
