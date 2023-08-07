@@ -732,9 +732,11 @@ class RedditMM(commands.Cog):
                 #       it also MUST be the last thing in content surrounded like this
                 text+= f"> _ {post['content_link']} _\n"
 
+
+                # DO NOT ADD ANY UNDERSCORES AFTER THIS
                 fav_text = ""
                 if post['author_favs'] is not None:
-                    fav_text = f"⭐ {post['author_favs']} _ _  "
+                    fav_text = f"⭐ {post['author_favs']}      "
                     
                 text+= f"> {fav_text}_{post['time_text']}_"
 
