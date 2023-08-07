@@ -734,7 +734,7 @@ class RedditMM(commands.Cog):
 
                 fav_text = ""
                 if post['author_favs'] is not None:
-                    fav_text = f"⭐{post['author_favs']}  "
+                    fav_text = f"⭐ {post['author_favs']} _ _  "
                     
                 text+= f"> {fav_text}_{post['time_text']}_"
 
