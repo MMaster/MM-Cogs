@@ -792,10 +792,12 @@ class RedditMM(commands.Cog):
             if feed.author:
                 author = unescape(feed.author.name)
                 if await self.db.get_ignored_redditor(channel.guild.id, author) is not None:
+                    log.info(f'Redditor {author} ignored. Skip.')
                     continue
 
             # if already seen (posted in any channel) in this server, skip
-            if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
+            if feed.url is not None and await self.db.get_seen_url(channel.guild.id, unescape(feed.url)) is not None:
+                log.info(f'URL {unescape(feed.url)} already seen. Skip.')
                 continue
 
             post = await self.prepare_post(feed, subreddit, channel.guild.id, settings)
