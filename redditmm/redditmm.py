@@ -243,6 +243,8 @@ class RedditMM(commands.Cog):
                     return
 
                 content_url = self.get_msg_content_url(reaction.message)
+                if content_url is None:
+                    content_url = ''
                 if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is not None:
                     await self.add_temporary_reaction(reaction.message, "♻")
                     return
@@ -304,6 +306,8 @@ class RedditMM(commands.Cog):
                     return
 
                 content_url = self.get_msg_content_url(reaction.message)
+                if content_url is None:
+                    content_url = ''
                 if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is None:
                     await self.add_temporary_reaction(reaction.message, "♻")
                     return
@@ -675,13 +679,13 @@ class RedditMM(commands.Cog):
             return None
 
         content = message.content
-        carr = content.rsplit('> _ http', maxsplit=1)
+        carr = content.rsplit('> _ ', maxsplit=1)
         if len(carr) < 2:
             return None
         carr = carr[1].rsplit(" _ \n", maxsplit=1)
         if len(carr) < 2:
             return None
-        return 'http' + carr[0]
+        return carr[0]
 
     async def prepare_post(self, feed, subreddit, guildID, settings):
         post = {}
