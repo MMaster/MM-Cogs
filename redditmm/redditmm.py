@@ -683,7 +683,7 @@ class RedditMM(commands.Cog):
             return None
         return carr[0]
 
-    async def prepare_post(self, feed, subreddit, settings):
+    async def prepare_post(self, feed, subreddit, guildID, settings):
         post = {}
         post["subreddit"] = unescape(subreddit)
         title = unescape(feed.title)
@@ -702,10 +702,11 @@ class RedditMM(commands.Cog):
 
         if feed.author:
             post["author"] = unescape(feed.author.name)
+            post["author_favs"] = await self.db.get_favorite(guildID, post['author'])
         else:
             post["author"] = None
+            post["author_favs"] = None
 
-        post["author_favs"] = await self.db.get_favorite(channel.guild.id, author)
 
         post["content_link"] = None
         url = unescape(feed.url)
@@ -797,7 +798,7 @@ class RedditMM(commands.Cog):
             if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
                 continue
 
-            post = await self.prepare_post(feed, subreddit, settings)
+            post = await self.prepare_post(feed, subreddit, channel.guild.id, settings)
             if settings.get("image_only") and post["content_link"] is None:
                 continue
 
