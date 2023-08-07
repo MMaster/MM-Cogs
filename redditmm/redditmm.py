@@ -679,13 +679,24 @@ class RedditMM(commands.Cog):
             return None
 
         content = message.content
+
+        # first try current format
+        # > _ < {post['content_link']} > _ \n
+        carr = content.rsplit('> _ < http', maxsplit=1)
+        if len(carr) == 2:
+            carr = carr[1].split(" > _ ", maxsplit=1)
+            if len(carr) == 2:
+                return 'http' + carr[0]
+
+        # try old format
+        # > _ {post['content_link']} _\n
         carr = content.rsplit('> _ http', maxsplit=1)
-        if len(carr) < 2:
-            return None
-        carr = carr[1].split(" _", maxsplit=1)
-        if len(carr) < 2:
-            return None
-        return 'http' + carr[0]
+        if len(carr) == 2:
+            carr = carr[1].split(" _", maxsplit=1)
+            if len(carr) == 2:
+                return 'http' + carr[0]
+
+        return None
 
     async def prepare_post(self, feed, subreddit, guildID, settings):
         post = {}
@@ -732,12 +743,11 @@ class RedditMM(commands.Cog):
                 text+= f"> ### {post['title']}\n"
                 if post['desc'] is not None and len(post['desc']) > 0:
                     text+= f"> _{post['desc']}_\n"
-                # WARN: content link MUST be "> _ {url} _ \n" for get_msg_content_url() to work
+                # WARN: content link MUST be "> _ < {url} > _ \n" for get_msg_content_url() to work
                 #       it also MUST be the last thing in content surrounded like this
-                text+= f"> _ {post['content_link']} _ \n"
+                text+= f"> _ < {post['content_link']} > _ \n"
 
-
-                # CAREFUL WITH ANY UNDERSCORES AFTER THIS
+                # CAREFUL WITH UNDERSCORES AFTER THIS
                 fav_text = ""
                 if post['author_favs'] is not None:
                     fav_text = f"⭐ {post['author_favs']}      "
