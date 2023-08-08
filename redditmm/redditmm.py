@@ -206,9 +206,9 @@ class RedditMM(commands.Cog):
 
         channel = self.bot.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        user = self.bot.get_user(payload.user_id)
+        user = guild.get_member(payload.user_id)
         if not user:
-            user = await self.bot.fetch_user(payload.user_id)
+            user = await guild.fetch_member(payload.user_id)
 
         if await self.bot.cog_disabled_in_guild(
             cog=self, guild=guild
@@ -281,9 +281,9 @@ class RedditMM(commands.Cog):
 
         channel = self.bot.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        user = self.bot.get_user(payload.user_id)
+        user = guild.get_member(payload.user_id)
         if not user:
-            user = await self.bot.fetch_user(payload.user_id)
+            user = await guild.fetch_member(payload.user_id)
 
         if await self.bot.cog_disabled_in_guild(
             cog=self, guild=guild
