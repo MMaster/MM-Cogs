@@ -618,7 +618,7 @@ class RedditMM(commands.Cog):
                                         view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                     )  # TODO: More approprriate error handling
                                     embs = post["embeds"]
-                                    embs.append(content_msg.embeds)
+                                    embs.extend(content_msg.embeds)
                                     emb_msg = await content_msg.edit(content=None, embeds=embs)
 
                                 if settings.get("publish", False):
