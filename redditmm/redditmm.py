@@ -200,7 +200,7 @@ class RedditMM(commands.Cog):
     ) -> None:
         reaction_emoji = str(payload.emoji)
 
-        if guild_id is None:
+        if payload.guild_id is None:
             return  # Reaction is on a private message
         guild = self.bot.get_guild(payload.guild_id)
 
@@ -271,7 +271,7 @@ class RedditMM(commands.Cog):
     ) -> None:
         reaction_emoji = str(payload.emoji)
 
-        if guild_id is None:
+        if payload.guild_id is None:
             return  # Reaction is on a private message
         guild = self.bot.get_guild(payload.guild_id)
 
@@ -294,7 +294,7 @@ class RedditMM(commands.Cog):
             return
 
         # remove ignore user
-        if reaction.emoji == "❌":
+        if reaction_emoji == "❌":
             async with ctx.typing():
                 redditor = self.get_msg_redditor(message)
                 if redditor is None:
@@ -314,7 +314,7 @@ class RedditMM(commands.Cog):
             return
 
         # remove favorite post
-        if reaction.emoji == "⭐":
+        if reaction_emoji == "⭐":
             async with ctx.typing():
                 redditor = self.get_msg_redditor(message)
                 if redditor is None:
