@@ -224,8 +224,11 @@ class RedditMM(commands.Cog):
 
         # ignore user
         if reaction_emoji == "❌":
+            # only allow admins and mods to do this
+            if not (await self.bot.is_admin(user) or await self.bot.is_mod(user)):
+                return
+
             async with ctx.typing():
-                # TODO: only allow admins to do this
                 redditor = self.get_msg_redditor(message)
                 if redditor is None:
                     await self.add_temporary_reaction(message, "⛔")
@@ -257,7 +260,8 @@ class RedditMM(commands.Cog):
                     await self.add_temporary_reaction(message, "♻")
                     return
 
-                if await self.db.add_favorite(guild.id, redditor, content_url, user.id) is None:
+                postlink = self.get_msg_source(message)
+                if await self.db.add_favorite(guild.id, redditor, content_url, user.id, postlink) is None:
                     await self.add_temporary_reaction(message, "⚠")
                     return
 
@@ -295,6 +299,10 @@ class RedditMM(commands.Cog):
 
         # remove ignore user
         if reaction_emoji == "❌":
+            # only allow admins and mods to do this
+            if not (await self.bot.is_admin(user) or await self.bot.is_mod(user)):
+                return
+
             async with ctx.typing():
                 redditor = self.get_msg_redditor(message)
                 if redditor is None:

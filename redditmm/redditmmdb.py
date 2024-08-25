@@ -25,43 +25,43 @@ class RedditMMDB():
     async def prepare_seen_urls_table(self, cur):
         # check if table exists
         cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='seen_urls'")
+        if cur.fetchone()[0] > 0:
+            return
 
-        #if the table does not exist, create it
-        if cur.fetchone()[0] == 0:
-            async with RedditMMDB._lock:
-                # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildURL UNIQUE (guildID, url))")
-                # create multi-index on it
-                cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID, url)")
+        async with RedditMMDB._lock:
+            # create seen urls table to store urls of posts we've already seen
+            cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildURL UNIQUE (guildID, url))")
+            # create multi-index on it
+            cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID, url)")
 
-                self.conn.commit()
+            self.conn.commit()
 
     async def prepare_ignored_redditors(self, cur):
         # check if table exists
         cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='ignored_redditors'")
+        if cur.fetchone()[0] > 0:
+            return
 
-        #if the table does not exist, create it
-        if cur.fetchone()[0] == 0:
-            async with RedditMMDB._lock:
-                # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditor UNIQUE (guildID, redditor))")
-                # create multi-index on it
-                cur.execute("CREATE INDEX ignored_redditors_idx ON ignored_redditors(guildID, redditor)")
+        async with RedditMMDB._lock:
+            # create seen urls table to store urls of posts we've already seen
+            cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditor UNIQUE (guildID, redditor))")
+            # create multi-index on it
+            cur.execute("CREATE INDEX ignored_redditors_idx ON ignored_redditors(guildID, redditor)")
 
-                self.conn.commit()
+            self.conn.commit()
 
     async def prepare_favorites(self, cur):
         # check if table exists
         cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='favorites'")
+        if cur.fetchone()[0] > 0:
+            return
 
-        #if the table does not exist, create it
-        if cur.fetchone()[0] == 0:
-            async with RedditMMDB._lock:
-                cur.execute("CREATE TABLE favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, userID INTEGER, redditor TEXT, url TEXT, favtime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditorURLUser UNIQUE (guildID, redditor, url, userID))")
-                # create multi-index on it
-                cur.execute("CREATE INDEX favorites_idx ON favorites(guildID, redditor, url, userID)")
+        async with RedditMMDB._lock:
+            cur.execute("CREATE TABLE favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, userID INTEGER, redditor TEXT, url TEXT, postlink TEXT, favtime DATETIME DEFAULT CURRENT_TIMESTAMP, CONSTRAINT UC_GuildRedditorURLUser UNIQUE (guildID, redditor, url, userID))")
+            # create multi-index on it
+            cur.execute("CREATE INDEX favorites_idx ON favorites(guildID, redditor, url, userID)")
 
-                self.conn.commit()
+            self.conn.commit()
 
     #
     # SEEN URLS
@@ -195,11 +195,11 @@ class RedditMMDB():
             log.error(f"Error executing SQL query: {query}", exc_info=e)
             return None
 
-    async def add_favorite(self, guildID, redditor, url, userID):
+    async def add_favorite(self, guildID, redditor, url, userID, postlink):
         try:
             cur = self.conn.cursor()
             cnt = None
-            query = f"INSERT INTO favorites (guildID, redditor, url, userID) VALUES ({guildID}, '{redditor}', '{url}', {userID})"
+            query = f"INSERT INTO favorites (guildID, redditor, url, userID, postlink) VALUES ({guildID}, '{redditor}', '{url}', {userID}, '{postlink}')"
             async with RedditMMDB._lock:
                 cur.execute(query)
                 cnt = cur.rowcount
