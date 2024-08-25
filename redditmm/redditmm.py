@@ -12,11 +12,11 @@ import asyncprawcore
 import discord
 import tabulate
 import validators
-import sqlite3
 from discord.http import Route
 from redbot.core import Config, data_manager, app_commands, commands
 from redbot.core.commands.converter import TimedeltaConverter
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify, spoiler
+from redditmmdb import RedditMMDB
 
 log = logging.getLogger("red.mmaster.redditmm")
 
@@ -33,109 +33,6 @@ class PosterView(discord.ui.View):
         if show_source:
             self.add_item(discord.ui.Button(label="Source", url=source))
 
-class RedditMMDB():
-    _lock = asyncio.Lock()
-
-    def __init__(self, data_path):
-        self.data_path = data_path
-        self.filepath = os.path.join(self.data_path, "datadb.sqlite3")
-        self.conn = None
-
-    async def prepare_seen_urls_table(self, cur):
-        # check if table exists
-        cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='seen_urls'")
-
-        #if the table does not exist, create it
-        if cur.fetchone()[0] == 0:
-            async with RedditMMDB._lock:
-                # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                # we will search by guildID so create index on it
-                cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID)")
-                # we will search for url so create index on it
-                cur.execute("CREATE INDEX seen_urls_idx_url ON seen_urls(url)")
-
-                self.conn.commit()
-
-    async def prepare_ignored_redditors(self, cur):
-        # check if table exists
-        cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='ignored_redditors'")
-
-        #if the table does not exist, create it
-        if cur.fetchone()[0] == 0:
-            async with RedditMMDB._lock:
-                # create seen urls table to store urls of posts we've already seen
-                cur.execute("CREATE TABLE ignored_redditors (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, redditor TEXT, ignoretime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-                # we will search by guildID so create index on it
-                cur.execute("CREATE INDEX ignored_redditors_idx_guildID ON ignored_redditors(guildID)")
-                # we will search for redditor so create index on it
-                cur.execute("CREATE INDEX ignored_redditors_idx_redditor ON ignored_redditors(redditor)")
-
-                self.conn.commit()
-
-    async def init(self):
-        async with RedditMMDB._lock:
-            self.conn = sqlite3.connect(self.filepath)
-
-        cur = self.conn.cursor()
-        cur.execute("PRAGMA journal_mode=wal")
-        await self.prepare_seen_urls_table(cur)
-        await self.prepare_ignored_redditors(cur)
-        cur.close()
-
-    async def get_seen_url(self, guildID, url):
-        cur = self.conn.cursor()
-        res = cur.execute(f"SELECT id FROM seen_urls WHERE guildID = {guildID} AND url = '{url}'")
-        rt = res.fetchone()
-        rowid = None
-        if rt is not None:
-            rowid = rt[0]
-        cur.close()
-        return rowid
-
-    async def add_seen_url(self, guildID, url):
-        cur = self.conn.cursor()
-        cnt = None
-        async with RedditMMDB._lock:
-            cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
-            cnt = cur.rowcount
-            self.conn.commit()
-
-        cur.close()
-        return cnt
-
-    async def get_ignored_redditor(self, guildID, redditor):
-        cur = self.conn.cursor()
-        res = cur.execute(f"SELECT id FROM ignored_redditors WHERE guildID = {guildID} AND redditor = '{redditor}'")
-        rt = res.fetchone()
-        rowid = None
-        if rt is not None:
-            rowid = rt[0]
-        cur.close()
-        return rowid
-
-    async def add_ignored_redditor(self, guildID, redditor):
-        cur = self.conn.cursor()
-        cnt = None
-        async with RedditMMDB._lock:
-            cur.execute(f"INSERT INTO ignored_redditors (guildID, redditor) VALUES ({guildID}, '{redditor}')")
-            rowid = cur.lastrowid
-            cnt = cur.rowcount
-            self.conn.commit()
-
-        cur.close()
-        return cnt
-
-    async def del_ignored_redditor(self, guildID, redditor):
-        cur = self.conn.cursor()
-        cnt = None
-        async with RedditMMDB._lock:
-            res = cur.execute(f"DELETE FROM ignored_redditors WHERE guildID = {guildID} AND redditor = '{redditor}'")
-            cnt = cur.rowcount
-            self.conn.commit()
-
-        cur.close()
-        return cnt
 
 
 class RedditMM(commands.Cog):
@@ -390,7 +287,7 @@ class RedditMM(commands.Cog):
     @commands.hybrid_group(aliases=["reddit"])
     async def redditmm(self, ctx):
         """Reddit auto-feed posting.
-        Use ❌ (:x:) reaction to ignore the reddit user."""
+        Use ❌ reaction on message to ignore the reddit user (on first message if multiple like for redgifs)."""
 
     @redditmm.command()
     @commands.is_owner()
