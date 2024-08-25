@@ -34,26 +34,32 @@ class PosterView(discord.ui.View):
             self.add_item(discord.ui.Button(label="Source", url=source))
 
 class RedditMMDB():
+    _lock = asyncio.Lock()
+
     def __init__(self, data_path):
         self.data_path = data_path
         self.filepath = os.path.join(self.data_path, "datadb.sqlite3")
         self.conn = None
 
-    def init(self):
-        self.conn = sqlite3.connect(self.filepath)
+    async def init(self):
+        async with RedditMMDB._lock:
+            self.conn = sqlite3.connect(self.filepath)
+
         cur = self.conn.cursor()
+        cur.execute("PRAGMA journal_mode=wal")
         cur.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='seen_urls'")
 
         #if the table does not exist, create it
         if cur.fetchone()[0] == 0:
-            # create seen urls table to store urls of posts we've already seen
-            cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP)")
-            # we will search by guildID so create index on it
-            cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID)")
-            # we will search for url so create index on it
-            cur.execute("CREATE INDEX seen_urls_idx_url ON seen_urls(url)")
+            async with RedditMMDB._lock:
+                # create seen urls table to store urls of posts we've already seen
+                cur.execute("CREATE TABLE seen_urls (id INTEGER PRIMARY KEY AUTOINCREMENT, guildID INTEGER, url TEXT, seentime DATETIME DEFAULT CURRENT_TIMESTAMP)")
+                # we will search by guildID so create index on it
+                cur.execute("CREATE INDEX seen_urls_idx_guildID ON seen_urls(guildID)")
+                # we will search for url so create index on it
+                cur.execute("CREATE INDEX seen_urls_idx_url ON seen_urls(url)")
 
-            self.conn.commit()
+                self.conn.commit()
 
         cur.close()
 
@@ -69,9 +75,11 @@ class RedditMMDB():
 
     def add_seen_url(self, guildID, url):
         cur = self.conn.cursor()
-        cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
-        seenid = cur.lastrowid
-        self.conn.commit()
+        async with RedditMMDB._lock:
+            cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
+            seenid = cur.lastrowid
+            self.conn.commit()
+
         cur.close()
         return seenid
 
