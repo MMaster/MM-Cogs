@@ -63,7 +63,7 @@ class RedditMMDB():
 
         cur.close()
 
-    def get_seen_url(self, guildID, url):
+    async def get_seen_url(self, guildID, url):
         cur = self.conn.cursor()
         res = cur.execute(f"SELECT id FROM seen_urls WHERE guildID = {guildID} AND url = '{url}'")
         rt = res.fetchone()
@@ -73,7 +73,7 @@ class RedditMMDB():
         cur.close()
         return seenid
 
-    def add_seen_url(self, guildID, url):
+    async def add_seen_url(self, guildID, url):
         cur = self.conn.cursor()
         async with RedditMMDB._lock:
             cur.execute(f"INSERT INTO seen_urls (guildID, url) VALUES ({guildID}, '{url}')")
@@ -116,7 +116,7 @@ class RedditMM(commands.Cog):
         pass
 
     async def init(self):
-        self.db.init()
+        await self.db.init()
         await self.bot.wait_until_red_ready()
         if await self.config.SCHEMA_VERSION() == 1:
             data = await self.config.all_channels()
@@ -594,7 +594,7 @@ class RedditMM(commands.Cog):
             timestamps.append(timestamp)
 
             # if already seen (posted in any channel) in this server, skip
-            if self.db.get_seen_url(channel.guild.id, feed.url) is not None:
+            if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
                 continue
 
             desc = unescape(feed.selftext)
@@ -668,7 +668,7 @@ class RedditMM(commands.Cog):
             posts.append(post)
 
             # remember we've seen this url for this server
-            self.db.add_seen_url(channel.guild.id, feed.url)
+            await self.db.add_seen_url(channel.guild.id, feed.url)
 
         if timestamps:
             if posts:
