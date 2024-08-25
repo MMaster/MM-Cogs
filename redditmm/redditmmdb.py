@@ -147,9 +147,9 @@ class RedditMMDB():
         cur = self.conn.cursor()
         query = f"SELECT count(id) FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'"
         if url is not None:
-            query += " AND url = '{url}'"
+            query += f" AND url = '{url}'"
         if userID is not None:
-            query += " AND userID = {userID}"
+            query += f" AND userID = {userID}"
 
         res = cur.execute(query)
         rt = res.fetchone()
@@ -178,9 +178,9 @@ class RedditMMDB():
         async with RedditMMDB._lock:
             query = f"DELETE FROM favorites WHERE guildID = {guildID} AND redditor = '{redditor}'"
             if url is not None:
-                query += " AND url = '{url}'"
+                query += f" AND url = '{url}'"
             if userID is not None:
-                query += " AND userID = {userID}"
+                query += f" AND userID = {userID}"
 
             res = cur.execute(query)
             cnt = cur.rowcount
