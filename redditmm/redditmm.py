@@ -195,129 +195,145 @@ class RedditMM(commands.Cog):
         await message.clear_reaction(emoji)
 
     @commands.Cog.listener()
-    async def on_reaction_add(
-        self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]
+    async def on_raw_reaction_add(
+        self, payload: discord.RawReactionActionEvent
     ) -> None:
+        reaction_emoji = str(payload.emoji)
+
+        if guild_id is None:
+            return  # Reaction is on a private message
+        guild = self.bot.get_guild(payload.guild_id)
+
+        channel = self.bot.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        user = self.bot.get_user(payload.user_id)
+        if not user:
+            user = await self.bot.fetch_user(payload.user_id)
+
         if await self.bot.cog_disabled_in_guild(
-            cog=self, guild=reaction.message.guild
+            cog=self, guild=guild
         ) or not await self.bot.allowed_by_whitelist_blacklist(who=user):
             return
-        if reaction.message.guild is None:
-            return
-        if not isinstance(user, discord.Member):
-            return
-        if user.id == reaction.message.guild.me.id:
+        if user.id == guild.me.id:
             return
 
         # if the message did not originate from this cog
-        ctx: commands.Context = await self.bot.get_context(reaction.message)
+        ctx: commands.Context = await self.bot.get_context(message)
         if ctx.valid and (ctx.command.cog_name != "RedditMM"):
             return
 
         # ignore user
-        if reaction.emoji == "❌":
+        if reaction_emoji == "❌":
             async with ctx.typing():
                 # TODO: only allow admins to do this
-                redditor = self.get_msg_redditor(reaction.message)
+                redditor = self.get_msg_redditor(message)
                 if redditor is None:
-                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await self.add_temporary_reaction(message, "⛔")
                     return
 
-                if await self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
-                    await self.add_temporary_reaction(reaction.message, "♻")
+                if await self.db.get_ignored_redditor(guild.id, redditor) is not None:
+                    await self.add_temporary_reaction(message, "♻")
                     return
 
-                if await self.db.add_ignored_redditor(user.guild.id, redditor) is None:
-                    await self.add_temporary_reaction(reaction.message, "⚠")
+                if await self.db.add_ignored_redditor(guild.id, redditor) is None:
+                    await self.add_temporary_reaction(message, "⚠")
                     return
 
-                await self.add_temporary_reaction(reaction.message, "✅")
+                await self.add_temporary_reaction(message, "✅")
             return
 
         # favorite post
-        if reaction.emoji == "⭐":
+        if reaction_emoji == "⭐":
             async with ctx.typing():
-                redditor = self.get_msg_redditor(reaction.message)
+                redditor = self.get_msg_redditor(message)
                 if redditor is None:
-                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await self.add_temporary_reaction(message, "⛔")
                     return
 
-                content_url = self.get_msg_content_url(reaction.message)
+                content_url = self.get_msg_content_url(message)
                 if content_url is None:
                     content_url = ''
-                if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is not None:
-                    await self.add_temporary_reaction(reaction.message, "♻")
+                if await self.db.get_favorite(guild.id, redditor, content_url, user.id) is not None:
+                    await self.add_temporary_reaction(message, "♻")
                     return
 
-                if await self.db.add_favorite(user.guild.id, redditor, content_url, user.id) is None:
-                    await self.add_temporary_reaction(reaction.message, "⚠")
+                if await self.db.add_favorite(guild.id, redditor, content_url, user.id) is None:
+                    await self.add_temporary_reaction(message, "⚠")
                     return
 
-                await self.add_temporary_reaction(reaction.message, "✅")
+                await self.add_temporary_reaction(message, "✅")
             return
 
 
     @commands.Cog.listener()
-    async def on_reaction_remove(
-        self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]
+    async def on_raw_reaction_remove(
+        self, payload: discord.RawReactionActionEvent
     ) -> None:
+        reaction_emoji = str(payload.emoji)
+
+        if guild_id is None:
+            return  # Reaction is on a private message
+        guild = self.bot.get_guild(payload.guild_id)
+
+        channel = self.bot.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        user = self.bot.get_user(payload.user_id)
+        if not user:
+            user = await self.bot.fetch_user(payload.user_id)
+
         if await self.bot.cog_disabled_in_guild(
-            cog=self, guild=reaction.message.guild
+            cog=self, guild=guild
         ) or not await self.bot.allowed_by_whitelist_blacklist(who=user):
             return
-        if reaction.message.guild is None:
-            return
-        if not isinstance(user, discord.Member):
-            return
-        if user.id == reaction.message.guild.me.id:
+        if user.id == guild.me.id:
             return
 
         # if the message did not originate from this cog
-        ctx: commands.Context = await self.bot.get_context(reaction.message)
+        ctx: commands.Context = await self.bot.get_context(message)
         if ctx.valid and (ctx.command.cog_name != "RedditMM"):
             return
 
         # remove ignore user
         if reaction.emoji == "❌":
             async with ctx.typing():
-                redditor = self.get_msg_redditor(reaction.message)
+                redditor = self.get_msg_redditor(message)
                 if redditor is None:
-                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await self.add_temporary_reaction(message, "⛔")
                     return
 
-                if await self.db.get_ignored_redditor(user.guild.id, redditor) is None:
-                    await self.add_temporary_reaction(reaction.message, "♻")
+                if await self.db.get_ignored_redditor(guild.id, redditor) is None:
+                    await self.add_temporary_reaction(message, "♻")
                     return
 
-                cnt = await self.db.del_ignored_redditor(user.guild.id, redditor)
+                cnt = await self.db.del_ignored_redditor(guild.id, redditor)
                 if cnt is None or cnt < 1:
-                    await self.add_temporary_reaction(reaction.message, "⚠")
+                    await self.add_temporary_reaction(message, "⚠")
                     return
 
-                await self.add_temporary_reaction(reaction.message, "✅")
+                await self.add_temporary_reaction(message, "✅")
             return
 
         # remove favorite post
         if reaction.emoji == "⭐":
             async with ctx.typing():
-                redditor = self.get_msg_redditor(reaction.message)
+                redditor = self.get_msg_redditor(message)
                 if redditor is None:
-                    await self.add_temporary_reaction(reaction.message, "⛔")
+                    await self.add_temporary_reaction(message, "⛔")
                     return
 
-                content_url = self.get_msg_content_url(reaction.message)
+                content_url = self.get_msg_content_url(message)
                 if content_url is None:
                     content_url = ''
-                if await self.db.get_favorite(user.guild.id, redditor, content_url, user.id) is None:
-                    await self.add_temporary_reaction(reaction.message, "♻")
+                if await self.db.get_favorite(guild.id, redditor, content_url, user.id) is None:
+                    await self.add_temporary_reaction(message, "♻")
                     return
 
-                cnt = await self.db.del_favorite(user.guild.id, redditor, content_url, user.id)
+                cnt = await self.db.del_favorite(guild.id, redditor, content_url, user.id)
                 if cnt is None or cnt < 1:
-                    await self.add_temporary_reaction(reaction.message, "⚠")
+                    await self.add_temporary_reaction(message, "⚠")
                     return
 
-                await self.add_temporary_reaction(reaction.message, "✅")
+                await self.add_temporary_reaction(message, "✅")
             return
 
     @commands.admin_or_permissions(manage_channels=True)
