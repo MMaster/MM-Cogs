@@ -619,7 +619,7 @@ class RedditMM(commands.Cog):
                                     )  # TODO: More approprriate error handling
                                     embs = post["embeds"]
                                     embs.append(content_msg.embeds)
-                                    content_msg.edit(content=None, embeds=embs)
+                                    emb_msg = await content_msg.edit(content=None, embeds=embs)
 
                                 if settings.get("publish", False):
                                     try:
