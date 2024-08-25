@@ -174,4 +174,5 @@ OTHER_MODELS_LIMITS = {
     "cinematika-7b": 7000,
     "gemma-7b-it": 7000,
     "llama-3-8b-instruct": 7000,
+    "koboldcpp/llama-3.1-8b-instruct-abliterated_via_adapter-q8_0": 31000,
 }

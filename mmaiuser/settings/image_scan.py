@@ -122,7 +122,8 @@ class ImageScanSettings(MixinMeta):
         """
         await ctx.message.add_reaction("🔄")
         models = [model.id for model in (await self.openai_client.models.list()).data]
-        models = list(set(models) & set(VISION_SUPPORTED_MODELS))  # only show supported models
+        models_filtered = [model for model in models if (model in VISION_SUPPORTED_MODELS) or ('llama-3' in model) or ('llama3' in model)]
+        models = models_filtered  # only show supported models
         await ctx.message.remove_reaction("🔄", ctx.me)
 
         if model_name not in models:

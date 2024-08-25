@@ -66,7 +66,10 @@ class MessagesList:
         try:
             self._encoding = tiktoken.encoding_for_model(self.model)
         except KeyError:
-            self._encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+            if ('llama-3' in self.model) or ('llama3' in self.model):
+                self._encoding = tiktoken.encoding_for_model("gpt2")
+            else:
+                self._encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
 
         if not prompt:  # jank
             await self.add_msg(self.init_message)
