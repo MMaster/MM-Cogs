@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from html import unescape
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 import asyncpraw
@@ -305,7 +305,7 @@ class RedditMM(commands.Cog):
 
     @commands.Cog.listener()
     async def on_reaction_add(
-        self, reaction: discord.Reaction, user: typing.Union[discord.Member, discord.User]
+        self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]
     ) -> None:
         if await self.bot.cog_disabled_in_guild(
             cog=self, guild=reaction.message.guild
