@@ -686,7 +686,7 @@ class RedditMM(commands.Cog):
             desc = "(spoiler)\n" + spoiler(desc)
         post["desc"] = desc
         post["source"] = unescape(f"https://reddit.com{feed.permalink}")
-        post["time_text"] = f"<t:{feed.created_utc}>"
+        post["time_text"] = f"<t:{int(feed.created_utc)}>"
         if feed.author:
             post["author"] = unescape(feed.author.name)
         else:
