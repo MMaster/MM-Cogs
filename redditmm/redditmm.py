@@ -679,13 +679,13 @@ class RedditMM(commands.Cog):
             return None
 
         content = message.content
-        carr = content.rsplit('> _ ', maxsplit=1)
+        carr = content.rsplit('> _ http', maxsplit=1)
         if len(carr) < 2:
             return None
-        carr = carr[1].rsplit(" _ \n", maxsplit=1)
+        carr = carr[1].split(" _", maxsplit=1)
         if len(carr) < 2:
             return None
-        return carr[0]
+        return 'http' + carr[0]
 
     async def prepare_post(self, feed, subreddit, guildID, settings):
         post = {}
