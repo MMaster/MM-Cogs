@@ -61,7 +61,7 @@ class RedditMMDB():
         cur = self.conn.cursor()
         res = cur.execute(f"SELECT id FROM seen_urls WHERE guildID = {guildID} AND url = '{url}'")
         rt = res.fetchone()
-        seeid = None
+        seenid = None
         if rt is not None:
             seenid = rt[0]
         cur.close()
