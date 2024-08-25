@@ -692,7 +692,7 @@ class RedditMM(commands.Cog):
 
         post["content_link"] = None
         url = unescape(feed.url)
-        if feed.permalink not in url and validators.url(image):
+        if feed.permalink not in url and validators.url(url):
             if "i.redgifs.com" in url and url.endswith(("png", "jpg", "jpeg", "gif")):
                 content_link = url.replace("i.redgifs.com", "www.redgifs.com").replace("/i/", "/watch/")
                 post["content_link"] = content_link.rsplit('.', maxsplit=1)[0]
