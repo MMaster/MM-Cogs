@@ -322,7 +322,7 @@ class RedditMM(commands.Cog):
     async def redditmm(self, ctx):
         """Reddit auto-feed posting.
         Use ❌ reaction on message to ignore the reddit user.
-        Use ⭐ reaction on message to favorite the post.":
+        Use ⭐ reaction on message to favorite the post.
         """
 
     @redditmm.command()
