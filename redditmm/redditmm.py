@@ -14,7 +14,7 @@ import tabulate
 import validators
 import sqlite3
 from discord.http import Route
-from redbot.core import Config, DataManager, app_commands, commands
+from redbot.core import Config, data_manager, app_commands, commands
 from redbot.core.commands.converter import TimedeltaConverter
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify, spoiler
 
@@ -90,7 +90,7 @@ class RedditMM(commands.Cog):
         self.config = Config.get_conf(self, identifier=141445739606515601, force_registration=True)
         self.config.register_channel(reddits={})
         self.config.register_global(delay=300, SCHEMA_VERSION=1)
-        self.data_path = DataManager.cog_data_path(self)
+        self.data_path = data_manager.cog_data_path(self)
         self.db = RedditMMDB(self.data_path)
         self.session = aiohttp.ClientSession()
         self.bg_loop_task: Optional[asyncio.Task] = None
