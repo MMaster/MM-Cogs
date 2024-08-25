@@ -555,6 +555,7 @@ class RedditMM(commands.Cog):
 
             embs = []
             post = {}
+            post["content_link"] = None
 
             #debug = str(feed.media_metadata)
             #if len(debug) > 1990:
@@ -568,7 +569,7 @@ class RedditMM(commands.Cog):
                 timestamp=datetime.utcfromtimestamp(feed.created_utc),
             )
             embed.set_author(name=f"New post on r/{unescape(subreddit)}")
-            embed.set_footer(text=f"{unescape(image)}")
+            embed.set_footer(text=f"u/{unescape(feed.author.name)}")
 
             if feed.author:
                 post["author"] = feed.author.name
@@ -585,7 +586,10 @@ class RedditMM(commands.Cog):
                 embed.add_field(name="Gallery URL", value=unescape(image))
                 images = True
             elif feed.permalink not in image and validators.url(image) and "redgifs.com" in image:
-                embed.set_image(url=unescape(image))
+                if "i.redgifs.com" in image:
+                    embed.set_image(url=unescape(image))
+                else:
+                    post["content_link"] = unescape(image)
                 embed.add_field(name="RedGIFS URL", value=unescape(image))
                 images = True
             elif feed.permalink not in image and validators.url(image):
@@ -605,6 +609,7 @@ class RedditMM(commands.Cog):
                         if webhook is None:
                             try:
                                 msg = await channel.send(
+                                    content=post["content_link"],
                                     embeds=post["embeds"],
                                     view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                 )  # TODO: More approprriate error handling
