@@ -23,17 +23,19 @@ REDDIT_REGEX = re.compile(
     r"(?i)\A(((https?://)?(www\.)?reddit\.com/)?r/)?([A-Za-z0-9][A-Za-z0-9_]{2,20})/?\Z"
 )
 
-
-class Source(discord.ui.View):
-    def __init__(self, url: str):
+class PosterView(discord.ui.View):
+    def __init__(self, author:str, show_author: bool, source: str, show_source: bool):
         super().__init__()
-        self.add_item(discord.ui.Button(label="Source", url=url))
+        if show_author and author != None:
+            self.add_item(discord.ui.Button(label=f"u/{unescape(author)}", url=f"https://www.reddit.com/user/{author}"))
+        if show_source:
+            self.add_item(discord.ui.Button(label="Source", url=source))
 
 
 class RedditMM(commands.Cog):
     """A reddit auto posting cog."""
 
-    __version__ = "0.7.0"
+    __version__ = "0.7.1"
 
     def format_help_for_context(self, ctx):
         """Thanks Sinbad."""
@@ -155,7 +157,7 @@ class RedditMM(commands.Cog):
                         "webhooks": feed.get("webhooks", False),
                         "logo": feed.get("logo", REDDIT_LOGO),
                         "image_only": feed.get("image_only", False),
-                        "source_button": feed.get("source_button", True),
+                        "source_button": feed.get("source_button", False),
                         "publish": feed.get("publish", False),
                     },
                 )
@@ -268,9 +270,9 @@ class RedditMM(commands.Cog):
         data = await self.config.channel(channel).reddits()
         if not data:
             return await ctx.send("No subreddits here.")
-        output = [[k, v.get("webhooks", "False"), v.get("latest", True), v.get("image_only", False)] for k, v in data.items()]
+        output = [[k, v.get("webhooks", "False"), v.get("latest", True), v.get("image_only", False), v.get("source_button", False)] for k, v in data.items()]
 
-        out = tabulate.tabulate(output, headers=["Subreddit", "Webhooks", "Latest Posts", "Image Only"])
+        out = tabulate.tabulate(output, headers=["Subreddit", "Webhooks", "Latest Posts", "Image Only", "Source Button"])
         for page in pagify(str(out)):
             await ctx.send(
                 embed=discord.Embed(
@@ -337,7 +339,7 @@ class RedditMM(commands.Cog):
                 "webhooks": feeds[subreddit].get("webhooks", False),
                 "logo": feeds[subreddit].get("logo", REDDIT_LOGO),
                 "image_only": False,
-                "source_button": True,
+                "source_button": False,
                 "publish": False,
             },
         )
@@ -348,22 +350,27 @@ class RedditMM(commands.Cog):
 
     @redditmm.command(name="latest")
     @app_commands.describe(
-        subreddit="The subreddit to check for latest posts.",
+        subreddit="The subreddit to check for latest posts (or !all for all subreddits).",
         channel="The channel for the subreddit.",
     )
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def latest(self, ctx, subreddit: str, latest: bool, channel: discord.TextChannel = None):
         """Whether to fetch all posts or just the latest post."""
         channel = channel or ctx.channel
-        subreddit = self._clean_subreddit(subreddit)
+        if subreddit != "!all":
+            subreddit = self._clean_subreddit(subreddit)
         if not subreddit:
             return await ctx.send("That doesn't look like a subreddit name to me.")
         async with self.config.channel(channel).reddits() as feeds:
-            if subreddit not in feeds:
-                await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
-                return
+            if subreddit == "!all":
+                for feed in feeds:
+                    feed["latest"] = on_or_off
+            else:
+                if subreddit not in feeds:
+                    await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
+                    return
 
-            feeds[subreddit]["latest"] = latest
+                feeds[subreddit]["latest"] = latest
         if ctx.interaction:
             await ctx.send("Subreddit updated.", ephemeral=True)
         else:
@@ -371,7 +378,7 @@ class RedditMM(commands.Cog):
 
     @redditmm.command()
     @app_commands.describe(
-        subreddit="The subreddit name",
+        subreddit="The subreddit name (or !all for all subreddits).",
         channel="The channel for the subreddit.",
         on_or_off="Whether to enable or disable images only.",
     )
@@ -381,15 +388,20 @@ class RedditMM(commands.Cog):
     ):
         """Whether to only post posts that contain an image."""
         channel = channel or ctx.channel
-        subreddit = self._clean_subreddit(subreddit)
+        if subreddit != "!all":
+            subreddit = self._clean_subreddit(subreddit)
         if not subreddit:
             return await ctx.send("That doesn't look like a subreddit name to me.")
         async with self.config.channel(channel).reddits() as feeds:
-            if subreddit not in feeds:
-                await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
-                return
+            if subreddit == "!all":
+                for feed in feeds:
+                    feed["image_only"] = on_or_off
+            else:
+                if subreddit not in feeds:
+                    await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
+                    return
 
-            feeds[subreddit]["image_only"] = on_or_off
+                feeds[subreddit]["image_only"] = on_or_off
         if ctx.interaction:
             await ctx.send("Subreddit updated.", ephemeral=True)
         else:
@@ -397,7 +409,7 @@ class RedditMM(commands.Cog):
 
     @redditmm.command()
     @app_commands.describe(
-        subreddit="The subreddit name",
+        subreddit="The subreddit name (or !all for all subreddits).",
         channel="The channel for the subreddit.",
         on_or_off="Whether to enable or disable source button.",
     )
@@ -407,15 +419,20 @@ class RedditMM(commands.Cog):
     ):
         """Whether to include a Source button.."""
         channel = channel or ctx.channel
-        subreddit = self._clean_subreddit(subreddit)
+        if subreddit != "!all":
+            subreddit = self._clean_subreddit(subreddit)
         if not subreddit:
             return await ctx.send("That doesn't look like a subreddit name to me.")
         async with self.config.channel(channel).reddits() as feeds:
-            if subreddit not in feeds:
-                await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
-                return
+            if subreddit == "!all":
+                for feed in feeds:
+                    feed["source_button"] = on_or_off
+            else:
+                if subreddit not in feeds:
+                    await ctx.send(f"No subreddit named {subreddit} in {channel.mention}.")
+                    return
+                feeds[subreddit]["source_button"] = on_or_off
 
-            feeds[subreddit]["source_button"] = on_or_off
         if ctx.interaction:
             await ctx.send("Subreddit updated.", ephemeral=True)
         else:
@@ -496,7 +513,7 @@ class RedditMM(commands.Cog):
 
     async def format_send(self, data, channel, last_post, subreddit, settings):
         timestamps = []
-        embeds = []
+        posts = []
         data = data[:1] if settings.get("latest", True) else data
         webhook = None
         try:
@@ -537,6 +554,8 @@ class RedditMM(commands.Cog):
             #        print(image_url)
 
             embs = []
+            post = {}
+
             #debug = str(feed.media_metadata)
             #if len(debug) > 1990:
             #    debug = f"DBG:{debug[:1990]}..."
@@ -549,8 +568,13 @@ class RedditMM(commands.Cog):
                 timestamp=datetime.utcfromtimestamp(feed.created_utc),
             )
             embed.set_author(name=f"New post on r/{unescape(subreddit)}")
+            embed.set_footer(text=f"{unescape(image)}")
+
             if feed.author:
-                embed.set_footer(text=f"{unescape(image)} by /u/{unescape(feed.author.name)}")
+                post["author"] = feed.author.name
+            else:
+                post["author"] = None
+
             images = False
             if image.endswith(("png", "jpg", "jpeg", "gif")) and not feed.spoiler:
                 embed.set_image(url=unescape(image))
@@ -559,19 +583,21 @@ class RedditMM(commands.Cog):
                 embed.add_field(name="Attachment", value=unescape(image))
             if settings.get("image_only") and not images:
                 continue
+
+            # TODO: gallery view, fetch images to multiple embeds
             embs.append(embed)
-            embeds.append(embs)
+            post["embeds"] = embs
+            posts.append(post)
+
         if timestamps:
-            if embeds:
+            if posts:
                 try:
-                    for embs in embeds[::-1]:
+                    for post in posts[::-1]:
                         if webhook is None:
                             try:
                                 msg = await channel.send(
-                                    embeds=embs,
-                                    view=Source(link)
-                                    if settings.get("source_button", True)
-                                    else None,
+                                    embeds=post["embeds"],
+                                    view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                 )  # TODO: More approprriate error handling
                                 if settings.get("publish", False):
                                     try:
@@ -584,9 +610,9 @@ class RedditMM(commands.Cog):
                                 log.info(f"Error sending message feed in {channel}. Bypassing")
                         else:
                             await webhook.send(
-                                username=f"r/{feed.subreddit}",
+                                username=f"r/{feed.subreddit} (u/{unescape(post['author'])})",
                                 avatar_url=settings.get("icon", REDDIT_LOGO),
-                                embeds=embs,
+                                embeds=post["embeds"],
                             )
                 except discord.HTTPException as exc:
                     log.error("Exception in bg_loop while sending message: ", exc_info=exc)
