@@ -683,7 +683,7 @@ class RedditMM(commands.Cog):
             return None
         return carr[0]
 
-    def prepare_post(self, feed, subreddit, settings):
+    async def prepare_post(self, feed, subreddit, settings):
         post = {}
         post["subreddit"] = unescape(subreddit)
         title = unescape(feed.title)
@@ -699,10 +699,13 @@ class RedditMM(commands.Cog):
         post["desc"] = desc
         post["source"] = unescape(f"https://reddit.com{feed.permalink}")
         post["time_text"] = f"<t:{int(feed.created_utc)}>"
+
         if feed.author:
             post["author"] = unescape(feed.author.name)
         else:
             post["author"] = None
+
+        post["author_favs"] = await self.db.get_favorite(channel.guild.id, author)
 
         post["content_link"] = None
         url = unescape(feed.url)
@@ -720,14 +723,19 @@ class RedditMM(commands.Cog):
     async def send_post(self, post, channel, settings, webhook):
         if webhook is None:
             try:
-                text = f"> _[[r/{post['subreddit']}](https://www.reddit.com/r/{post['subreddit']}/)]_\n"
+                text = f"> _[[r/{post['subreddit']}](https://www.reddit.com/r/{post['subreddit']}/)]_ \n"
                 text+= f"> ### {post['title']}\n"
                 if post['desc'] is not None and len(post['desc']) > 0:
                     text+= f"> _{post['desc']}_\n"
                 # WARN: content link MUST be "_ {url} _" for get_msg_content_url() to work
                 #       it also MUST be the last thing in content surrounded like this
                 text+= f"> _ {post['content_link']} _\n"
-                text+= f"> _{post['time_text']}_"
+
+                fav_text = ""
+                if post['author_favs'] is not None:
+                    fav_text = f"⭐{post['author_favs']}  "
+                    
+                text+= f"> {fav_text}_{post['time_text']}_"
 
                 msg = await channel.send(
                     content=text,
@@ -789,7 +797,7 @@ class RedditMM(commands.Cog):
             if await self.db.get_seen_url(channel.guild.id, feed.url) is not None:
                 continue
 
-            post = self.prepare_post(feed, subreddit, settings)
+            post = await self.prepare_post(feed, subreddit, settings)
             if settings.get("image_only") and post["content_link"] is None:
                 continue
 
