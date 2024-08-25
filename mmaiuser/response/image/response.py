@@ -1,0 +1,101 @@
+import logging
+import re
+
+import discord
+from redbot.core import commands
+
+from mmaiuser.abc import MixinMeta
+from mmaiuser.common.constants import (IMAGE_REQUEST_REPLY_PROMPT,
+                                     IMAGE_REQUEST_SD_GEN_PROMPT)
+from mmaiuser.messages_list.messages import create_messages_list
+from mmaiuser.response.chat.openai import OpenAIAPIGenerator
+from mmaiuser.response.chat.response import ChatResponse
+from mmaiuser.response.image.generator import ImageGenerator
+
+logger = logging.getLogger("red.mmaster.mmaiuser")
+
+
+class ImageResponse():
+    def __init__(self, cog: MixinMeta, ctx: commands.Context, image_generator: ImageGenerator):
+        self.ctx = ctx
+        self.config = cog.config
+        self.cog = cog
+        self.message = ctx.message
+        self.image_generator = image_generator
+
+    async def send(self):
+        image, caption = None, None
+        try:
+            caption = await self._create_image_caption()
+            if caption is None:
+                return False
+
+            image = await self.image_generator.generate_image(caption)
+            if image is None:
+                return False
+
+        except Exception:
+            logger.exception(f"Error while attempting to generate image")
+            return False
+
+        response = None
+        saved_caption = await self._format_saved_caption(caption)
+
+        message_list = await create_messages_list(self.cog, self.ctx)
+        await message_list.add_system(saved_caption, index=len(message_list) + 1)
+        await message_list.add_system(IMAGE_REQUEST_REPLY_PROMPT, index=len(message_list) + 1)
+        chat = OpenAIAPIGenerator(self.cog, self.ctx, message_list)
+        response = ChatResponse(self.ctx, self.config, chat)
+
+        if not (await response.send()):
+            await self._clean_error_emojis()
+            await self.message.add_reaction("👍")
+
+        image_msg = await self.message.channel.send(file=discord.File(image, filename=f"{self.message.id}.png"))
+
+        self.cog.cached_messages[image_msg.id] = saved_caption
+        return True
+
+    async def _create_image_caption(self):
+        subject = await self.config.guild(self.message.guild).image_requests_subject()
+
+        botname = self.message.guild.me.nick or self.message.guild.me.display_name
+        request = self.message.content
+
+        for m in self.message.mentions:
+            request = request.replace(m.mention, m.display_name)
+
+        for w in (await self.config.guild(self.ctx.guild).image_requests_second_person_trigger_words()):
+            pattern = r'\b{}\b'.format(re.escape(w))
+            request = re.sub(pattern, subject, request, flags=re.IGNORECASE)
+
+        pattern = r'\b{}\b'.format(re.escape(botname))
+        request = re.sub(pattern, subject, request, flags=re.IGNORECASE)
+
+        response = await self.cog.openai_client.chat.completions.create(
+            model=await self.config.guild(self.message.guild).model(),
+            messages=[
+                {"role": "system", "content": IMAGE_REQUEST_SD_GEN_PROMPT},
+                {"role": "user", "content": request}
+            ],
+        )
+        prompt = response.choices[0].message.content.lower()
+        if "sorry" in prompt:
+            return None
+        return prompt
+
+    async def _format_saved_caption(self, caption):
+        subject = await self.config.guild(self.message.guild).image_requests_subject()
+
+        pattern = r'\b{}\b'.format(re.escape(subject))
+        caption = re.sub(pattern, "", caption, flags=re.IGNORECASE)
+        caption = re.sub(r'^[\s,]+', '', caption)
+        return f"You sent: [Image: A picture of yourself. Keywords describing this picture would be: {caption}]"
+
+    async def _clean_error_emojis(self):
+        emojis = ["💤", "⚠️"]
+        for emoji in emojis:
+            try:
+                await self.message.remove_reaction(emoji, self.ctx.me)
+            except Exception:
+                pass

@@ -7,6 +7,9 @@
     "short": "Cogs by MMaster.",
     "description": "Cogs by MMaster.",
     "tags": [
-        "reddit"
+        "reddit",
+	"ai",
+	"llm",
+	"openai"
     ]
 }

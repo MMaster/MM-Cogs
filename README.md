@@ -21,3 +21,4 @@ MMaster's Cogs for use on Red-Discordbot.
 # Credits
 
 flare#0001 - original redditpost cog (https://github.com/flaree/flare-cogs)
+zhaobenny - original aiuser cog (https://github.com/zhaobenny/bz-cogs)
