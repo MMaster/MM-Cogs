@@ -629,31 +629,37 @@ class RedditMM(commands.Cog):
 
     def get_msg_redditor(self, message: discord.Message):
         if message is None:
+            log.info("Cannot call get_msg_redditor on None message.")
             return None
 
         if message.components is None or len(message.components) < 2:
+            log.info(f"Message components don't match expectation.")
             return None
 
         for comp in message.components:
-            if comp.emoji == "👤":
+            if str(comp.emoji) == "👤":
                 author = comp.label
                 if not author.startswith("u/"):
                     return None
                 return author[2:]
 
+        log.info("Author component not found")
         return None
 
     def get_msg_source(self, message: discord.Message):
         if message is None:
+            log.info("Cannot call get_msg_source on None message.")
             return None
 
         if message.components is None or len(message.components) < 2:
+            log.info(f"Message components don't match expectation.")
             return None
 
         for comp in message.components:
-            if comp.emoji == "🌐":
+            if str(comp.emoji) == "🌐":
                 return comp.url
 
+        log.info("Source component not found")
         return None
 
     def get_msg_content_url(self, message: discord.Message):
