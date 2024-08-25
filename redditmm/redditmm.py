@@ -326,26 +326,27 @@ class RedditMM(commands.Cog):
 
         # ignore user
         if reaction.emoji == "❌":
-            redditor = get_message_redditor(reaction.message)
-            if redditor is None:
-                await reaction.message.add_reaction("⛔")
-                return
+            async with ctx.typing():
+                redditor = get_message_redditor(reaction.message)
+                if redditor is None:
+                    await reaction.message.add_reaction("⛔")
+                    return
 
-            if self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
-                await reaction.message.add_reaction("♻")
-                return
+                if self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
+                    await reaction.message.add_reaction("♻")
+                    return
 
-            if self.db.add_ignored_redditor(user.guild.id, redditor) is None:
-                await reaction.message.add_reaction("⚠")
-                return
+                if self.db.add_ignored_redditor(user.guild.id, redditor) is None:
+                    await reaction.message.add_reaction("⚠")
+                    return
 
-            await reaction.message.add_reaction("✅")
-            return
+                await reaction.message.add_reaction("✅")
+                return
 
 
     @commands.Cog.listener()
     async def on_reaction_remove(
-        self, reaction: discord.Reaction, user: typing.Union[discord.Member, discord.User]
+        self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]
     ) -> None:
         if await self.bot.cog_disabled_in_guild(
             cog=self, guild=reaction.message.guild
@@ -366,22 +367,23 @@ class RedditMM(commands.Cog):
 
         # remove ignore user
         if reaction.emoji == "❌":
-            redditor = get_message_redditor(reaction.message)
-            if redditor is None:
-                await reaction.message.add_reaction("⛔")
-                return
+            async with ctx.typing():
+                redditor = get_message_redditor(reaction.message)
+                if redditor is None:
+                    await reaction.message.add_reaction("⛔")
+                    return
 
-            if self.db.get_ignored_redditor(user.guild.id, redditor) is None:
-                await reaction.message.add_reaction("♻")
-                return
+                if self.db.get_ignored_redditor(user.guild.id, redditor) is None:
+                    await reaction.message.add_reaction("♻")
+                    return
 
-            cnt = self.db.del_ignored_redditor(user.guild.id, redditor)
-            if cnt is None or cnt < 1:
-                await reaction.message.add_reaction("⚠")
-                return
+                cnt = self.db.del_ignored_redditor(user.guild.id, redditor)
+                if cnt is None or cnt < 1:
+                    await reaction.message.add_reaction("⚠")
+                    return
 
-            await reaction.message.clear_reaction("✅")
-            return
+                await reaction.message.clear_reaction("✅")
+                return
 
     @commands.admin_or_permissions(manage_channels=True)
     @commands.guild_only()
