@@ -16,7 +16,7 @@ from redbot.core import Config, app_commands, commands
 from redbot.core.commands.converter import TimedeltaConverter
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify, spoiler
 
-log = logging.getLogger("red.mmaster.redditfeed")
+log = logging.getLogger("red.mmaster.redditmm")
 
 REDDIT_LOGO = "https://www.redditinc.com/assets/images/site/reddit-logo.png"
 REDDIT_REGEX = re.compile(
@@ -30,7 +30,7 @@ class Source(discord.ui.View):
         self.add_item(discord.ui.Button(label="Source", url=url))
 
 
-class RedditFeed(commands.Cog):
+class RedditMM(commands.Cog):
     """A reddit auto posting cog."""
 
     __version__ = "0.7.0"
@@ -71,11 +71,11 @@ class RedditFeed(commands.Cog):
                         except IndexError:
                             sub_data[feed]["subreddit"] = None
             await self.bot.send_to_owners(
-                "Hi there.\nRedditFeed accomodates the new reddit ratelimits. This cog requires authenthication.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditfeed clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`\n"
+                "Hi there.\nRedditMM accomodates the new reddit ratelimits. This cog requires authenthication.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditmm clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`\n"
             )
             await self.config.SCHEMA_VERSION.set(2)
 
-        token = await self.bot.get_shared_api_tokens("redditfeed")
+        token = await self.bot.get_shared_api_tokens("redditmm")
         try:
             self.client = asyncpraw.Reddit(
                 client_id=token.get("clientid", None),
@@ -87,7 +87,7 @@ class RedditFeed(commands.Cog):
         except Exception as exc:
             log.error("Exception in init: ", exc_info=exc)
             await self.bot.send_to_owners(
-                "An exception occured in the authenthication. Please ensure the client id and secret are set correctly.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditfeed clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
+                "An exception occured in the authenthication. Please ensure the client id and secret are set correctly.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditmm clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
             )
 
     async def cog_unload(self):
@@ -98,7 +98,7 @@ class RedditFeed(commands.Cog):
 
     @commands.Cog.listener()
     async def on_red_api_tokens_update(self, service_name, api_tokens):
-        if service_name == "redditfeed":
+        if service_name == "redditmm":
             try:
                 self.client = asyncpraw.Reddit(
                     client_id=api_tokens.get("clientid", None),
@@ -108,7 +108,7 @@ class RedditFeed(commands.Cog):
             except Exception as exc:
                 log.error("Exception in init: ", exc_info=exc)
                 await self.bot.send_to_owners(
-                    "An exception occured in the authenthication. Please ensure the client id and secret are set correctly.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditfeed clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
+                    "An exception occured in the authenthication. Please ensure the client id and secret are set correctly.\nTo setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditmm clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
                 )
 
     async def bg_loop(self):
@@ -121,7 +121,7 @@ class RedditFeed(commands.Cog):
             except Exception as exc:
                 log.error("Exception in bg_loop: ", exc_info=exc)
                 if not self.notified:
-                    msg = "An exception occured in the background loop for `redditfeed`. Check your logs for more details and if possible, report them to the cog creator.\nYou will no longer receive this message until you reload the cog to reduce spam."
+                    msg = "An exception occured in the background loop for `redditmm`. Check your logs for more details and if possible, report them to the cog creator.\nYou will no longer receive this message until you reload the cog to reduce spam."
                     await self.bot.send_to_owners(msg)
                     self.notified = True
 
@@ -172,18 +172,18 @@ class RedditFeed(commands.Cog):
 
     @commands.admin_or_permissions(manage_channels=True)
     @commands.guild_only()
-    @commands.hybrid_group(aliases=["redditfeed"])
-    async def redditfeed(self, ctx):
+    @commands.hybrid_group(aliases=["redditmm"])
+    async def redditmm(self, ctx):
         """Reddit auto-feed posting."""
 
-    @redditfeed.command()
+    @redditmm.command()
     @commands.is_owner()
     async def setup(self, ctx):
-        """Details on setting up RedditFeed"""
-        msg = "To setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditfeed clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
+        """Details on setting up RedditMM"""
+        msg = "To setup the cog create an application via https://www.reddit.com/prefs/apps/. Once this is done, copy the client ID found under the name and the secret found inside.\nYou can then setup this cog by using `[p]set api redditmm clientid CLIENT_ID_HERE clientsecret CLIENT_SECRET_HERE`"
         await ctx.send(msg)
 
-    @redditfeed.command()
+    @redditmm.command()
     @commands.is_owner()
     async def delay(
         self,
@@ -201,7 +201,7 @@ class RedditFeed(commands.Cog):
             f"The {humanize_timedelta(seconds=seconds)} delay will come into effect on the next loop."
         )
 
-    @redditfeed.command()
+    @redditmm.command()
     @app_commands.describe(
         image_only="Whether to show only posts with images.", 
         subreddit="The subreddit to add.", 
@@ -216,7 +216,7 @@ class RedditFeed(commands.Cog):
             return await ctx.send("That doesn't look like a subreddit name to me.")
         if self.client is None:
             await ctx.send(
-                f"Please setup the client correctly, `{ctx.clean_prefix}redditfeed setup` for more information"
+                f"Please setup the client correctly, `{ctx.clean_prefix}redditmm setup` for more information"
             )
             return
         async with ctx.typing():
@@ -257,7 +257,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command()
+    @redditmm.command()
     @app_commands.describe(channel="The channel to list subreddits for.")
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def list(self, ctx, channel: discord.TextChannel = None):
@@ -280,7 +280,7 @@ class RedditFeed(commands.Cog):
                 )
             )
 
-    @redditfeed.command(name="remove")
+    @redditmm.command(name="remove")
     @app_commands.describe(
         subreddit="The subreddit to remove.", channel="The channel to remove from."
     )
@@ -304,7 +304,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command(name="force")
+    @redditmm.command(name="force")
     @app_commands.describe(subreddit="The subreddit to force.", channel="The channel to force in.")
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def force(self, ctx, subreddit: str, channel: Optional[discord.TextChannel] = None):
@@ -319,7 +319,7 @@ class RedditFeed(commands.Cog):
             return
         if self.client is None:
             await ctx.send(
-                f"Please setup the client correctly, `{ctx.clean_prefix}redditfeed setup` for more information"
+                f"Please setup the client correctly, `{ctx.clean_prefix}redditmm setup` for more information"
             )
             return
         data = await self.fetch_feed(feeds[subreddit]["subreddit"])
@@ -346,7 +346,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command(name="latest")
+    @redditmm.command(name="latest")
     @app_commands.describe(
         subreddit="The subreddit to check for latest posts.",
         channel="The channel for the subreddit.",
@@ -369,7 +369,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command()
+    @redditmm.command()
     @app_commands.describe(
         subreddit="The subreddit name",
         channel="The channel for the subreddit.",
@@ -395,7 +395,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command()
+    @redditmm.command()
     @app_commands.describe(
         subreddit="The subreddit name",
         channel="The channel for the subreddit.",
@@ -421,7 +421,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command()
+    @redditmm.command()
     @app_commands.describe(
         subreddit="The subreddit name",
         channel="The channel for the subreddit.",
@@ -452,7 +452,7 @@ class RedditFeed(commands.Cog):
         else:
             await ctx.tick()
 
-    @redditfeed.command(
+    @redditmm.command(
         name="webhook", aliases=["webhooks"], usage="<subreddit> <true_or_false> [channel]"
     )
     @app_commands.describe(
