@@ -332,11 +332,11 @@ class RedditMM(commands.Cog):
                     await reaction.message.add_reaction("⛔")
                     return
 
-                if self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
+                if await self.db.get_ignored_redditor(user.guild.id, redditor) is not None:
                     await reaction.message.add_reaction("♻")
                     return
 
-                if self.db.add_ignored_redditor(user.guild.id, redditor) is None:
+                if await self.db.add_ignored_redditor(user.guild.id, redditor) is None:
                     await reaction.message.add_reaction("⚠")
                     return
 
@@ -373,11 +373,11 @@ class RedditMM(commands.Cog):
                     await reaction.message.add_reaction("⛔")
                     return
 
-                if self.db.get_ignored_redditor(user.guild.id, redditor) is None:
+                if await self.db.get_ignored_redditor(user.guild.id, redditor) is None:
                     await reaction.message.add_reaction("♻")
                     return
 
-                cnt = self.db.del_ignored_redditor(user.guild.id, redditor)
+                cnt = await self.db.del_ignored_redditor(user.guild.id, redditor)
                 if cnt is None or cnt < 1:
                     await reaction.message.add_reaction("⚠")
                     return
