@@ -614,12 +614,9 @@ class RedditMM(commands.Cog):
                                 )  # TODO: More approprriate error handling
                                 if post["content_link"]:
                                     content_msg = await channel.send(
-                                        content=post["content_link"],
+                                        content=f"* {post['content_link']} *",
                                         view=PosterView(post["author"], True, link, settings.get("source_button", False)),
                                     )  # TODO: More approprriate error handling
-                                    embs = post["embeds"]
-                                    embs.extend(content_msg.embeds)
-                                    emb_msg = await content_msg.edit(content=None, embeds=embs)
 
                                 if settings.get("publish", False):
                                     try:
