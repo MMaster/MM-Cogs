@@ -64,6 +64,7 @@ class OpenAIAPIGenerator(ChatGenerator):
             output = output.replace("<|im_end|>", "")
             output = output.replace("<|im_start|>user", "")
             output = output.replace("<|im_start|>assistant", "")
+            output = output.replace("<|im_start|>", "")
             return output, None
         else:
             response = await self.openai_client.chat.completions.create(
