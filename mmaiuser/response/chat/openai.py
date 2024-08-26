@@ -52,7 +52,7 @@ class OpenAIAPIGenerator(ChatGenerator):
             response = await self.openai_client.completions.create(
                 model=self.model, prompt=prompt, **kwargs
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content, None
         elif is_koboldcpp_model(self.model):
             prompt = ""
             for message in self.messages:
@@ -60,7 +60,7 @@ class OpenAIAPIGenerator(ChatGenerator):
             response = await self.openai_client.completions.create(
                 model=self.model, prompt=prompt, stop=["<|im_end|>", "<|im_start|>"], **kwargs
             )
-            return response.choices[0].text
+            return response.choices[0].text, None
         else:
             response = await self.openai_client.chat.completions.create(
                 model=self.model, messages=self.msg_list.get_json(), **kwargs
