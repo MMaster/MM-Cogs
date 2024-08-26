@@ -56,9 +56,9 @@ class OpenAIAPIGenerator(ChatGenerator):
         elif is_koboldcpp_model(self.model):
             prompt = ""
             for message in self.messages:
-                prompt += f'<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n<|im_start|>assistant\n'
+                prompt += f'<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n'
             response = await self.openai_client.completions.create(
-                model=self.model, prompt=prompt, stop=["<|im_end|>", "<|im_start|>user"], **kwargs
+                model=self.model, prompt=prompt + '<|im_start|>assistant\n', stop=["<|im_end|>", "<|im_start|>user"], **kwargs
             )
             output = response.choices[0].text
             output = output.replace("<|im_end|>", "")
