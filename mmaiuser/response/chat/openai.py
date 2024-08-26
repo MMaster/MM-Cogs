@@ -9,7 +9,7 @@ from redbot.core import commands
 
 from mmaiuser.abc import MixinMeta
 from mmaiuser.common.constants import FUNCTION_CALLING_SUPPORTED_MODELS, VISION_SUPPORTED_MODELS
-from mmaiuser.common.utilities import get_enabled_tools
+from mmaiuser.common.utilities import get_enabled_tools, is_koboldcpp_model
 from mmaiuser.functions.tool_call import ToolCall
 from mmaiuser.functions.types import ToolCallSchema
 from mmaiuser.messages_list.messages import MessagesList
@@ -49,6 +49,14 @@ class OpenAIAPIGenerator(ChatGenerator):
     async def create_completion(self, kwargs: Dict[str, Any]) -> str:
         if "gpt-3.5-turbo-instruct" in self.model:
             prompt = "\n".join(message["content"] for message in self.messages)
+            response = await self.openai_client.completions.create(
+                model=self.model, prompt=prompt, **kwargs
+            )
+            return response.choices[0].message.content
+        elif is_koboldcpp_model(self.model):
+            prompt = ""
+            for message in self.messages:
+                prompt += f"<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n"
             response = await self.openai_client.completions.create(
                 model=self.model, prompt=prompt, **kwargs
             )

@@ -96,6 +96,10 @@ def is_using_openrouter_endpoint(client: AsyncOpenAI):
     return str(client.base_url).startswith(OPENROUTER_URL)
 
 
+def is_koboldcpp_model(model: str):
+    return model.startswith("koboldcpp/")
+
+
 async def get_enabled_tools(config: Config, ctx: commands.Context) -> list:
     from mmaiuser.functions.noresponse.tool_call import NoResponseToolCall
     from mmaiuser.functions.scrape.tool_call import ScrapeToolCall
