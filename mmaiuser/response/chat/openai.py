@@ -58,9 +58,13 @@ class OpenAIAPIGenerator(ChatGenerator):
             for message in self.messages:
                 prompt += f'<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n<|im_start|>assistant\n'
             response = await self.openai_client.completions.create(
-                model=self.model, prompt=prompt, stop=["<|im_end|>", "<|im_start|>"], **kwargs
+                model=self.model, prompt=prompt, stop=["<|im_end|>", "<|im_start|>user"], **kwargs
             )
-            return response.choices[0].text, None
+            output = response.choices[0].text
+            output = output.replace("<|im_end|>", "")
+            output = output.replace("<|im_start|>user", "")
+            output = output.replace("<|im_start|>assistant", "")
+            return output, None
         else:
             response = await self.openai_client.chat.completions.create(
                 model=self.model, messages=self.msg_list.get_json(), **kwargs
