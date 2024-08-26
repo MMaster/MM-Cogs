@@ -69,7 +69,7 @@ class OpenAIAPIGenerator(ChatGenerator):
             tag_msg_start_s = tag_msg_start.strip()
             tag_msg_end_s = tag_msg_end.strip()
             tag_role_start_s = tag_role_start.strip()
-            tag_role_end_s = tag_role_end_s.strip()
+            tag_role_end_s = tag_role_end.strip()
 
             prompt = tag_start
             for message in self.messages:
