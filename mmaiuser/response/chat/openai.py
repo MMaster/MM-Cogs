@@ -54,17 +54,36 @@ class OpenAIAPIGenerator(ChatGenerator):
             )
             return response.choices[0].message.content, None
         elif is_koboldcpp_model(self.model):
-            prompt = ""
+##
+## <|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are a helpful AI assistant for travel tips and recommendations<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nWhat can you help me with?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n
+##
+            # Local LLM template tags
+            tag_start = "<|begin_of_text|>"
+            tag_msg_start = ""
+            tag_msg_end = "<|eot_id|>"
+            tag_role_start = "<|start_header_id|>"
+            tag_role_end = "<|end_header_id|>\n\n"
+
+            # stripped
+            tag_start_s = tag_start.strip()
+            tag_msg_start_s = tag_msg_start.strip()
+            tag_msg_end_s = tag_msg_end.strip()
+            tag_role_start_s = tag_role_start.strip()
+            tag_role_end_s = tag_role_end_s.strip()
+
+            prompt = tag_start
             for message in self.messages:
-                prompt += f'<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n'
+                prompt += f'{tag_role_start}{message["role"]}{tag_role_end}{message["content"]}{tag_msg_end}'
             response = await self.openai_client.completions.create(
-                model=self.model, prompt=prompt + '<|im_start|>assistant\n', stop=["<|im_end|>", "<|im_start|>user"], **kwargs
+                model=self.model, prompt=prompt + f'{tag_role_start}assistant{tag_role_end}', stop=[tag_msg_end_s, tag_role_start_s, tag_role_end_s], **kwargs
             )
             output = response.choices[0].text
-            output = output.replace("<|im_end|>", "")
-            output = output.replace("<|im_start|>user", "")
-            output = output.replace("<|im_start|>assistant", "")
-            output = output.replace("<|im_start|>", "")
+            output = output.replace(tag_start_s, "")
+            output = output.replace(tag_msg_start_s, "")
+            output = output.replace(tag_role_start_s + 'user', "")
+            output = output.replace(tag_role_start_s + 'assistant', "")
+            output = output.replace(tag_role_start_s, "")
+            output = output.replace(tag_msg_end_s, "")
             return output, None
         else:
             response = await self.openai_client.chat.completions.create(
